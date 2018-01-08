@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/ssh"
@@ -22,7 +23,7 @@ func (azure Azure) getCommandEnvironment() []string {
 }
 
 // Provision the necessary infrastructure as described in the plan
-func (azure Azure) Provision(plan install.Plan) (*install.Plan, error) {
+func (azure Azure) Provision(plan install.Plan, opts ProvisionOpts) (*install.Plan, error) {
 	// Create directory for keeping cluster state
 	clusterStateDir, err := azure.getClusterStateDir(plan.Cluster.Name)
 	if err != nil {
@@ -78,6 +79,8 @@ func (azure Azure) Provision(plan install.Plan) (*install.Plan, error) {
 	initCmd := exec.Command(azure.BinaryPath, "init", providerDir)
 	initCmd.Env = cmdEnv
 	initCmd.Dir = cmdDir
+	initCmd.Stdout = azure.Terraform.Output
+	initCmd.Stderr = azure.Terraform.Output
 	if out, err := initCmd.CombinedOutput(); err != nil {
 		fmt.Fprintln(azure.Output, string(out))
 		return nil, fmt.Errorf("Error initializing terraform: %s", err)
@@ -87,10 +90,12 @@ func (azure Azure) Provision(plan install.Plan) (*install.Plan, error) {
 	planCmd := exec.Command(azure.BinaryPath, "plan", fmt.Sprintf("-out=%s", plan.Cluster.Name), providerDir)
 	planCmd.Env = cmdEnv
 	planCmd.Dir = cmdDir
-
-	if out, err := planCmd.CombinedOutput(); err != nil {
-		fmt.Fprintln(azure.Output, string(out))
-		return nil, fmt.Errorf("Error running terraform plan: %s", out)
+	captured, err := azure.captureOutputAndWrite(planCmd)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.Contains(captured, "0 to destroy") && !opts.AllowDestruction {
+		return nil, fmt.Errorf("Destruction of resources detected when not issuing a destroy")
 	}
 
 	// Terraform apply

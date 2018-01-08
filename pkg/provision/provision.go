@@ -1,6 +1,7 @@
 package provision
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,10 @@ import (
 )
 
 const terraformBinaryPath = "../../bin/terraform"
+
+type ProvisionOpts struct {
+	AllowDestruction bool
+}
 
 // Terraform provisioner
 type Terraform struct {
@@ -45,7 +50,7 @@ type tfOutputVar struct {
 // Provisioner is responsible for creating and destroying infrastructure for
 // a given cluster.
 type Provisioner interface {
-	Provision(install.Plan) (*install.Plan, error)
+	Provision(install.Plan, ProvisionOpts) (*install.Plan, error)
 	Destroy(clusterName string) error
 }
 
@@ -215,4 +220,15 @@ func (tf Terraform) buildPopulatedPlan(plan install.Plan) (*install.Plan, error)
 	}
 
 	return &plan, nil
+}
+
+func (tf Terraform) captureOutputAndWrite(cmd *exec.Cmd) (string, error) {
+	var capture bytes.Buffer
+	w := io.MultiWriter(&capture, tf.Output)
+	cmd.Stdout = w
+	cmd.Stderr = w
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("Error running %s %s: %s", cmd.Args[0], cmd.Args[1], err)
+	}
+	return capture.String(), nil
 }

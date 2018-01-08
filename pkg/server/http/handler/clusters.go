@@ -66,8 +66,9 @@ type ClusterResponse struct {
 // for hosting the cluster
 type Provisioner struct {
 	// Options: aws
-	Provider string            `json:"provider"`
-	Options  map[string]string `json:"options"`
+	Provider         string            `json:"provider"`
+	Options          map[string]string `json:"options"`
+	AllowDestruction bool              `json:"allowDestruction"`
 }
 
 // Create a cluster as described in the request body's JSON payload.
@@ -388,7 +389,8 @@ func buildStoreCluster(req ClusterRequest) store.Cluster {
 		WorkerCount:  req.WorkerCount,
 		IngressCount: req.IngressCount,
 		Provisioner: store.Provisioner{
-			Provider: req.Provisioner.Provider,
+			Provider:         req.Provisioner.Provider,
+			AllowDestruction: req.Provisioner.AllowDestruction,
 		},
 	}
 	switch req.Provisioner.Provider {

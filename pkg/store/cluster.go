@@ -32,9 +32,10 @@ type ClusterStatus struct {
 // The Provisioner specifies the infrastructure provisioner that should be used
 // for the cluster.
 type Provisioner struct {
-	Provider    string
-	Credentials ProvisionerCredentials
-	Options     ProvisionerOptions
+	Provider         string
+	Credentials      ProvisionerCredentials
+	Options          ProvisionerOptions
+	AllowDestruction bool
 }
 
 // ProvisionerCredentials are the credentials necessary for connecting to the

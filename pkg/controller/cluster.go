@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/apprenda/kismatic/pkg/provision"
+
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/store"
 	"github.com/google/go-cmp/cmp"
@@ -231,7 +233,10 @@ func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
-	updatedPlan, err := provisioner.Provision(*plan)
+	opts := provision.ProvisionOpts{
+		AllowDestruction: cluster.Spec.Provisioner.AllowDestruction,
+	}
+	updatedPlan, err := provisioner.Provision(*plan, opts)
 	if err != nil {
 		c.log.Printf("error provisioning infrastructure for cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = provisionFailed

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/ssh"
@@ -20,7 +21,7 @@ func (aws AWS) getCommandEnvironment() []string {
 }
 
 // Provision the necessary infrastructure as described in the plan
-func (aws AWS) Provision(plan install.Plan) (*install.Plan, error) {
+func (aws AWS) Provision(plan install.Plan, opts ProvisionOpts) (*install.Plan, error) {
 	// Create directory for keeping cluster state
 	clusterStateDir, err := aws.getClusterStateDir(plan.Cluster.Name)
 	if err != nil {
@@ -102,13 +103,14 @@ func (aws AWS) Provision(plan install.Plan) (*install.Plan, error) {
 
 	// Terraform plan
 	planCmd := exec.Command(aws.BinaryPath, "plan", fmt.Sprintf("-out=%s", plan.Cluster.Name), providerDir)
-	planCmd.Stdout = aws.Terraform.Output
-	planCmd.Stderr = aws.Terraform.Output
 	planCmd.Env = cmdEnv
 	planCmd.Dir = cmdDir
-
-	if err := planCmd.Run(); err != nil {
-		return nil, fmt.Errorf("Error running terraform plan: %s", err)
+	captured, err := aws.captureOutputAndWrite(planCmd)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.Contains(captured, "0 to destroy") && !opts.AllowDestruction {
+		return nil, fmt.Errorf("Destruction of resources detected when not issuing a destroy. If this is intended, please")
 	}
 
 	// Terraform apply

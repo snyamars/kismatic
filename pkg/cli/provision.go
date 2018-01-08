@@ -15,6 +15,7 @@ import (
 
 // NewCmdProvision creates a new provision command
 func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Command {
+	provisionOpts := provision.ProvisionOpts{}
 	cmd := &cobra.Command{
 		Use:   "provision",
 		Short: "provision your Kubernetes cluster",
@@ -48,7 +49,7 @@ func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comm
 					AccessKeyID:     access,
 					SecretAccessKey: secret,
 				}
-				updatedPlan, err := aws.Provision(*plan)
+				updatedPlan, err := aws.Provision(*plan, provisionOpts)
 				if err != nil {
 					return err
 				}
@@ -68,7 +69,7 @@ func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comm
 					ClientSecret:   cSecret,
 					TenantID:       tID,
 				}
-				updatedPlan, err := azure.Provision(*plan)
+				updatedPlan, err := azure.Provision(*plan, provisionOpts)
 				if err != nil {
 					return err
 				}
@@ -81,6 +82,7 @@ func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comm
 			}
 		},
 	}
+	cmd.Flags().BoolVar(&provisionOpts.AllowDestruction, "allow-destruction", false, "Allows possible infrastructure destruction through provisioner planning, required if mutation is scaling down (Use with care)")
 	return cmd
 }
 
