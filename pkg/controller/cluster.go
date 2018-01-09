@@ -193,21 +193,8 @@ func (c *clusterController) plan(cluster store.Cluster) store.Cluster {
 		return cluster
 	}
 
-	// If a plan already exists, reuse the password instead of generating a new one.
-	var existingPassword string
 	fp := install.FilePlanner{File: c.planFilePath()}
-	if fp.PlanExists() {
-		p, err := fp.Read()
-		if err != nil {
-			c.log.Printf("error reading the existing plan for cluster %q: %v", c.clusterName, err)
-			cluster.Status.CurrentState = planningFailed
-			cluster.Status.WaitingForManualRetry = true
-			return cluster
-		}
-		existingPassword = p.Cluster.AdminPassword
-	}
-
-	err := writePlanFile(c.clusterName, fp, cluster.Spec, existingPassword)
+	err := writePlanFile(c.clusterName, fp, cluster.Spec)
 	if err != nil {
 		c.log.Printf("error planning installation for cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = planningFailed
@@ -329,13 +316,12 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	return cluster
 }
 
-func writePlanFile(clusterName string, filePlanner install.FilePlanner, clusterSpec store.ClusterSpec, existingPassword string) error {
+func writePlanFile(clusterName string, filePlanner install.FilePlanner, clusterSpec store.ClusterSpec) error {
 	planTemplate := install.PlanTemplateOptions{
-		AdminPassword: existingPassword,
-		EtcdNodes:     clusterSpec.EtcdCount,
-		MasterNodes:   clusterSpec.MasterCount,
-		WorkerNodes:   clusterSpec.WorkerCount,
-		IngressNodes:  clusterSpec.IngressCount,
+		EtcdNodes:    clusterSpec.EtcdCount,
+		MasterNodes:  clusterSpec.MasterCount,
+		WorkerNodes:  clusterSpec.WorkerCount,
+		IngressNodes: clusterSpec.IngressCount,
 	}
 	planner := &install.BytesPlanner{}
 	if err := install.WritePlanTemplate(planTemplate, planner); err != nil {
