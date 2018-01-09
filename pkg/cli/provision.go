@@ -77,6 +77,8 @@ func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comm
 					return fmt.Errorf("error writing updated plan file to %s: %v", opts.planFilename, err)
 				}
 				return nil
+			case "":
+				return fmt.Errorf("provider cannot be empty")
 			default:
 				return fmt.Errorf("provider %s not yet supported", plan.Provisioner.Provider)
 			}
@@ -128,6 +130,8 @@ func NewCmdDestroy(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comman
 					TenantID:       tID,
 				}
 				return azure.Destroy(plan.Cluster.Name)
+			case "":
+				return fmt.Errorf("provider cannot be empty")
 			default:
 				return fmt.Errorf("provider %s not yet supported", plan.Provisioner.Provider)
 			}

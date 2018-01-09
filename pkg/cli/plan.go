@@ -96,7 +96,9 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
 	fmt.Fprintln(out)
 	fmt.Fprintf(out, "Generating installation plan file template with: \n")
 	fmt.Fprintf(out, "- %s cluster name\n", name)
-	fmt.Fprintf(out, "- %s infrastructure provisioner\n", provisioner)
+	if provisioner != "" {
+		fmt.Fprintf(out, "- %s infrastructure provisioner\n", provisioner)
+	}
 	fmt.Fprintf(out, "- %d etcd nodes\n", etcdNodes)
 	fmt.Fprintf(out, "- %d master nodes\n", masterNodes)
 	fmt.Fprintf(out, "- %d worker nodes\n", workerNodes)
