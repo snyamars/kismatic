@@ -46,7 +46,7 @@ bare-build: bin/$(GOOS)/kismatic
 
 bare-build-update-dist: bare-build
 	cp -r ansible out/ansible/playbooks
-	cp -r terraform/* out/terraform	
+	cp -r providers/* out/providers
 	cp bin/$(GOOS)/kismatic out/
 
 build-inspector: vendor
@@ -173,9 +173,8 @@ bare-dist: vendor-ansible/out vendor-terraform/out vendor-kuberang/$(KUBERANG_VE
 	cp -r bin/inspector/* out/ansible/playbooks/inspector
 	mkdir -p out/ansible/playbooks/kuberang/linux/amd64/
 	cp vendor-kuberang/$(KUBERANG_VERSION)/kuberang-linux-amd64 out/ansible/playbooks/kuberang/linux/amd64/kuberang
-	mkdir -p out/terraform/bin
-	cp -r vendor-terraform/out/$(GOOS)/terraform out/terraform/bin/
-	cp -r terraform/* out/terraform
+	cp vendor-terraform/out/$(GOOS)/terraform out/terraform
+	cp -r providers out/providers
 	cp vendor-kubectl/out/kubectl-$(KUBECTL_VERSION)-$(GOOS)-amd64 out/kubectl
 	cp vendor-helm/out/helm-$(HELM_VERSION)-$(GOOS)-amd64 out/helm
 	rm -f out/kismatic.tar.gz

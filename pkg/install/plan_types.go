@@ -81,27 +81,8 @@ type Provisioner struct {
 	// The provisioner will expect provider specific ENV variables to be set.
 	// Options: aws, azure, ""
 	Provider string
-	// AWS specific options.
-	// Only set if using "aws" provider
-	AWSOptions *AWSProvisionerOptions `yaml:"aws_options,omitempty"`
-	// Azure specific options.
-	// Only set if using "azure" provider
-	AzureOptions *AzureProvisionerOptions `yaml:"azure_options,omitempty"`
-}
-
-// AWSProvisionerOptions contains specific options used when provisioning infrastructue on AWS
-type AWSProvisionerOptions struct {
-	// The AWS region to deploy in
-	// +required
-	Region string `yaml:"region"`
-	//TODO: add AZ options, and make machine-type configurable.
-}
-
-// AazureProvisionerOptions contains specific options used when provisioning infrastructue Azure
-type AzureProvisionerOptions struct {
-	// The Azure region to deploy in
-	// +required
-	Location string `yaml:"location"`
+	// The options that apply to the chosen infrastructure provider.
+	Options map[string]string `json:"options" yaml:"options"`
 }
 
 // Cluster describes a Kubernetes cluster

@@ -136,7 +136,6 @@ func (v *validator) valid() (bool, []error) {
 
 func (p *Plan) validate() (bool, []error) {
 	v := newValidator()
-	v.validate(&p.Provisioner)
 	v.validate(&p.Cluster)
 	v.validate(&p.DockerRegistry)
 	if p.Cluster.DisconnectedInstallation && !p.PrivateRegistryProvided() {
@@ -153,15 +152,6 @@ func (p *Plan) validate() (bool, []error) {
 	v.validate(&p.NFS)
 	v.validateWithErrPrefix("Storage nodes", &p.Storage)
 
-	return v.valid()
-}
-
-func (p *Provisioner) validate() (bool, []error) {
-
-	v := newValidator()
-	if !util.Contains(p.Provider, InfrastructureProviders()) {
-		v.addError(fmt.Errorf("%q is not a valid provisioner provider. Options are %v", p.Provider, InfrastructureProviders()))
-	}
 	return v.valid()
 }
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/apprenda/kismatic/pkg/server/http/handler"
+	"github.com/apprenda/kismatic/pkg/store"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
@@ -79,12 +80,14 @@ The error: %v
 					MasterCount:  1,
 					WorkerCount:  1,
 					IngressCount: 1,
-					Provisioner: handler.Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
 						Options: map[string]string{
+							"region": "us-east-1",
+						},
+						Secrets: map[string]string{
 							"accessKeyId":     accessKeyID,
 							"secretAccessKey": secretAccessKey,
-							"region":          "us-east-1",
 						},
 					},
 				}

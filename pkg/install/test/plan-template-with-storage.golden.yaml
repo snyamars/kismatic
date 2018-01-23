@@ -1,7 +1,6 @@
 provisioner:
   provider: aws
-  aws_options:
-    region: ""
+  options: {}
 
 cluster:
   name: kubernetes

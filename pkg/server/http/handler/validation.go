@@ -62,31 +62,6 @@ func (r *ClusterRequest) validate() (bool, []error) {
 	if r.IngressCount < 0 {
 		v.addError(fmt.Errorf("cluster.ingressCount must be greater than or equal to 0"))
 	}
-	v.validate(&r.Provisioner)
-	return v.valid()
-}
-
-func (p *Provisioner) validate() (bool, []error) {
-	v := newValidator()
-	if p.Provider == "" {
-		v.addError(fmt.Errorf("provisioner.provider cannot be empty"))
-	} else {
-		if !util.Contains(p.Provider, validProvisionerProviders) {
-			v.addError(fmt.Errorf("%s is not a valid provisioner.provider, options are: %v", p.Provider, validProvisionerProviders))
-		}
-		switch p.Provider {
-		case "aws":
-			if p.Options[awsOptionAccessKeyID] == "" {
-				v.addError(fmt.Errorf("provisioner.options.accessKeyId cannot be empty"))
-			}
-			if p.Options[awsOptionSecretAccessKey] == "" {
-				v.addError(fmt.Errorf("provisioner.options.secretAccessKey cannot be empty"))
-			}
-			if p.Options[awsOptionRegion] == "" {
-				v.addError(fmt.Errorf("provisioner.options.region cannot be empty"))
-			}
-		}
-	}
 	return v.valid()
 }
 
@@ -122,8 +97,6 @@ func (c *clusterUpdate) validate() (bool, []error) {
 	if c.request.IngressCount < 0 {
 		v.addError(fmt.Errorf("cluster.ingressCount must be greater than or equal to 0"))
 	}
-	// always require provisioner credentials
-	v.validate(&c.request.Provisioner)
 	return v.valid()
 }
 

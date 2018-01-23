@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	nethttp "net/http"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/apprenda/kismatic/pkg/controller"
 	"github.com/apprenda/kismatic/pkg/install"
+	"github.com/apprenda/kismatic/pkg/plan"
+	"github.com/apprenda/kismatic/pkg/provision"
 	"github.com/apprenda/kismatic/pkg/server/http"
 	"github.com/apprenda/kismatic/pkg/server/http/handler"
 	"github.com/apprenda/kismatic/pkg/store"
@@ -124,16 +127,26 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		}
 	}()
 
-	// Setup provisioner
-	tfCreater := controller.TerraformProvisionerCreator(
-		filepath.Join(pwd, "terraform/bin/terraform"),
-		install.KismaticVersion,
-	)
+	provisionerCreator := func(out io.Writer) provision.Provisioner {
+		return provision.AnyTerraform{
+			Output:          out,
+			BinaryPath:      filepath.Join(pwd, "terraform"),
+			KismaticVersion: install.KismaticVersion.String(),
+			StateDir:        assetsDir,
+			ProvidersDir:    filepath.Join(pwd, "providers"),
+			SecretsGetter:   storeSecretsGetter{store: clusterStore},
+		}
+	}
+
+	planner := plan.ProviderTemplatePlanner{
+		ProvidersDir: filepath.Join(pwd, "providers"),
+	}
 
 	ctrl := controller.New(
 		logger,
+		planner,
 		controller.DefaultExecutorCreator(),
-		tfCreater,
+		provisionerCreator,
 		clusterStore,
 		10*time.Minute,
 		controller.AssetsDir(assetsDir),
@@ -151,4 +164,33 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		logger.Fatalf("Error shutting down server: %v", err)
 	}
 	return nil
+}
+
+type storeSecretsGetter struct {
+	store store.ClusterStore
+}
+
+// GetAsEnvironmentVariables returns the expected environment variables sourcing
+// them from the cluster store.
+func (ssg storeSecretsGetter) GetAsEnvironmentVariables(clusterName string, expected map[string]string) ([]string, error) {
+	c, err := ssg.store.Get(clusterName)
+	if err != nil {
+		return nil, err
+	}
+	storedSecrets := c.Spec.Provisioner.Secrets
+	var envVars []string
+	for expectedKey, envVar := range expected {
+		var found bool
+		for key, value := range storedSecrets {
+			if key == expectedKey {
+				found = true
+				envVars = append(envVars, fmt.Sprintf("%s=%s", envVar, value))
+				continue
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("required option %q was not provided", expectedKey)
+		}
+	}
+	return envVars, nil
 }

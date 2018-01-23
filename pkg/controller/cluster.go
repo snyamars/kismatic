@@ -31,6 +31,11 @@ const (
 	destroyed       = "destroyed"
 )
 
+// The Planner returns a plan template for the given infrastructure provider
+type Planner interface {
+	GetPlanTemplate(provider string) (*install.Plan, error)
+}
+
 // The clusterController manages the lifecycle of a single cluster.
 type clusterController struct {
 	log              *log.Logger
@@ -40,6 +45,7 @@ type clusterController struct {
 	logFile          io.Writer
 	executor         install.Executor
 	newProvisioner   ProvisionerCreator
+	planner          Planner
 	clusterStore     store.ClusterStore
 }
 
@@ -194,7 +200,7 @@ func (c *clusterController) plan(cluster store.Cluster) store.Cluster {
 	}
 
 	fp := install.FilePlanner{File: c.planFilePath()}
-	err := writePlanFile(c.clusterName, fp, cluster.Spec)
+	err := c.writePlanFile(c.clusterName, fp, cluster.Spec)
 	if err != nil {
 		c.log.Printf("error planning installation for cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = planningFailed
@@ -211,7 +217,7 @@ func (c *clusterController) planFilePath() string {
 
 func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 	c.log.Printf("provisioning infrastructure for cluster %q", c.clusterName)
-	provisioner := c.newProvisioner(cluster, c.logFile)
+	provisioner := c.newProvisioner(c.logFile)
 	fp := install.FilePlanner{File: c.planFilePath()}
 	plan, err := fp.Read()
 	if err != nil {
@@ -243,9 +249,8 @@ func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 
 func (c *clusterController) destroy(cluster store.Cluster) store.Cluster {
 	c.log.Printf("destroying cluster %q", c.clusterName)
-	provisioner := c.newProvisioner(cluster, c.logFile)
-	err := provisioner.Destroy(c.clusterName)
-	if err != nil {
+	provisioner := c.newProvisioner(c.logFile)
+	if err := provisioner.Destroy(cluster.Spec.Provisioner.Provider, c.clusterName); err != nil {
 		c.log.Printf("error destroying cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = destroyFailed
 		cluster.Status.WaitingForManualRetry = true
@@ -316,33 +321,19 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	return cluster
 }
 
-func writePlanFile(clusterName string, filePlanner install.FilePlanner, clusterSpec store.ClusterSpec) error {
-	planTemplate := install.PlanTemplateOptions{
-		EtcdNodes:    clusterSpec.EtcdCount,
-		MasterNodes:  clusterSpec.MasterCount,
-		WorkerNodes:  clusterSpec.WorkerCount,
-		IngressNodes: clusterSpec.IngressCount,
-	}
-	planner := &install.BytesPlanner{}
-	if err := install.WritePlanTemplate(planTemplate, planner); err != nil {
-		return fmt.Errorf("could not write plan template: %v", err)
-	}
-	p, err := planner.Read()
+func (c clusterController) writePlanFile(clusterName string, filePlanner install.FilePlanner, clusterSpec store.ClusterSpec) error {
+	// Get the plan template for the given provider
+	p, err := c.planner.GetPlanTemplate(clusterSpec.Provisioner.Provider)
 	if err != nil {
-		return fmt.Errorf("could not read plan: %v", err)
+		return fmt.Errorf("could not get plan file template for provider %q: %v", clusterSpec.Provisioner.Provider, err)
 	}
-	// Set values in the plan
+	// Set values in plan according to cluster spec
 	p.Cluster.Name = clusterName
+	p.Etcd.ExpectedCount = clusterSpec.EtcdCount
+	p.Master.ExpectedCount = clusterSpec.MasterCount
+	p.Worker.ExpectedCount = clusterSpec.WorkerCount
+	p.Ingress.ExpectedCount = clusterSpec.IngressCount
 	p.Provisioner = install.Provisioner{Provider: clusterSpec.Provisioner.Provider}
-
-	// Set infrastructure provider specific options
-	switch clusterSpec.Provisioner.Provider {
-	case "aws":
-		p.Provisioner.AWSOptions = &install.AWSProvisionerOptions{
-			Region: clusterSpec.Provisioner.Options.AWS.Region,
-		}
-	case "azure":
-		p.AddOns.CNI.Provider = "weave"
-	}
+	p.Provisioner.Options = clusterSpec.Provisioner.Options
 	return filePlanner.Write(p)
 }

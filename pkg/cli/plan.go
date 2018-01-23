@@ -3,8 +3,10 @@ package cli
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 
 	"github.com/apprenda/kismatic/pkg/install"
+	"github.com/apprenda/kismatic/pkg/plan"
 	"github.com/apprenda/kismatic/pkg/util"
 	"github.com/spf13/cobra"
 )
@@ -27,24 +29,26 @@ func NewCmdPlan(in io.Reader, out io.Writer, options *installOpts) *cobra.Comman
 }
 
 func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
+	providersDir := "./providers"
 	fmt.Fprintln(out, "Plan your Kubernetes cluster:")
 
 	name, err := util.PromptForAnyString(in, out, "Cluster name (must be unique)", "kismatic-cluster")
 	if err != nil {
 		return fmt.Errorf("Error setting infrastructure provisioner: %v", err)
 	}
-	provisioner, err := util.PromptForString(in, out, "Infrastructure provider (optional, leave blank if nodes are already provisioned)", "", install.InfrastructureProviders())
+
+	var provider string
+	availProviders, err := availableInfraProviders(providersDir)
 	if err != nil {
-		return fmt.Errorf("Error setting infrastructure provisioner: %v", err)
+		return err
+	}
+	if len(availProviders) > 0 {
+		provider, err = util.PromptForString(in, out, "Infrastructure provider (optional, leave blank if nodes are already provisioned)", "", availProviders)
+		if err != nil {
+			return fmt.Errorf("Error setting infrastructure provider: %v", err)
+		}
 	}
 
-	//This is provider specific, otherwise != "" would be fine.
-	switch provisioner {
-	case "aws":
-		fmt.Fprintln(out, "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY prior to running, otherwise provisioner validation will fail.")
-	case "azure":
-		fmt.Fprintln(out, "Set ARM_SUBSCRIPTION_ID, ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID prior to running, otherwise provisioner valiation will fail.")
-	}
 	etcdNodes, err := util.PromptForInt(in, out, "Number of etcd nodes", 3)
 	if err != nil {
 		return fmt.Errorf("Error reading number of etcd nodes: %v", err)
@@ -96,8 +100,10 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
 	fmt.Fprintln(out)
 	fmt.Fprintf(out, "Generating installation plan file template with: \n")
 	fmt.Fprintf(out, "- %s cluster name\n", name)
-	if provisioner != "" {
-		fmt.Fprintf(out, "- %s infrastructure provisioner\n", provisioner)
+	if provider != "" {
+		fmt.Fprintf(out, "- %s infrastructure provider\n", provider)
+	} else {
+		fmt.Fprintf(out, "- no infrastructure provider\n")
 	}
 	fmt.Fprintf(out, "- %d etcd nodes\n", etcdNodes)
 	fmt.Fprintf(out, "- %d master nodes\n", masterNodes)
@@ -107,9 +113,29 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
 	fmt.Fprintf(out, "- %d nfs volumes\n", nfsVolumes)
 	fmt.Fprintln(out)
 
+	// If we are using KET to provision infrastructure, use the template file
+	// defined by the infrastructure provider. Otherwise, generate the template
+	// as we always have.
+	if provider != "" {
+		templater := plan.ProviderTemplatePlanner{ProvidersDir: providersDir}
+		planTemplate, err := templater.GetPlanTemplate(provider)
+		if err != nil {
+			return err
+		}
+		planTemplate.Cluster.Name = name
+		planTemplate.Provisioner.Provider = provider
+		planTemplate.Etcd.ExpectedCount = etcdNodes
+		planTemplate.Master.ExpectedCount = masterNodes
+		planTemplate.Worker.ExpectedCount = workerNodes
+		planTemplate.Ingress.ExpectedCount = ingressNodes
+		planTemplate.Storage.ExpectedCount = storageNodes
+
+		return planner.Write(planTemplate)
+	}
+
 	planTemplate := install.PlanTemplateOptions{
 		ClusterName:               name,
-		InfrastructureProvisioner: provisioner,
+		InfrastructureProvisioner: provider,
 		EtcdNodes:                 etcdNodes,
 		MasterNodes:               masterNodes,
 		WorkerNodes:               workerNodes,
@@ -123,4 +149,18 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
 	fmt.Fprintf(out, "Wrote plan file template to %q\n", planner.File)
 	fmt.Fprintf(out, "Edit the plan file to further describe your cluster. Once ready, execute the \"install validate\" command to proceed.\n")
 	return nil
+}
+
+func availableInfraProviders(providersDir string) ([]string, error) {
+	files, err := ioutil.ReadDir(providersDir)
+	if err != nil {
+		return nil, err
+	}
+	var p []string
+	for _, f := range files {
+		if f.IsDir() {
+			p = append(p, f.Name())
+		}
+	}
+	return p, nil
 }

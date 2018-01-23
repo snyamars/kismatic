@@ -16,19 +16,12 @@ import (
 )
 
 var (
-	awsOptionAccessKeyID     = "accessKeyId"
-	awsOptionSecretAccessKey = "secretAccessKey"
-	awsOptionRegion          = "region"
-
 	// ErrClusterNotFound is the error returned by the API when a requested cluster
 	// is not found in the server.
 	ErrClusterNotFound = errors.New("cluster details not found in the store")
 
 	// the states that can be requested through the API
 	validStates = []string{"planned", "provisioned", "installed"}
-
-	// the provisioners that are supported
-	validProvisionerProviders = []string{"aws"}
 )
 
 // The Clusters handler exposes endpoints for managing the lifecycle of clusters
@@ -40,35 +33,34 @@ type Clusters struct {
 
 // ClusterRequest is the cluster resource defined by the user of the API
 type ClusterRequest struct {
-	Name         string      `json:"name"`
-	DesiredState string      `json:"desiredState"`
-	EtcdCount    int         `json:"etcdCount"`
-	MasterCount  int         `json:"masterCount"`
-	WorkerCount  int         `json:"workerCount"`
-	IngressCount int         `json:"ingressCount"`
-	Provisioner  Provisioner `json:"provisioner"`
-}
-
-// ClusterResponse is the cluster resource returned by the server
-type ClusterResponse struct {
-	Name         string      `json:"name"`
-	DesiredState string      `json:"desiredState"`
-	CurrentState string      `json:"currentState"`
-	ClusterIP    string      `json:"clusterIP"`
-	EtcdCount    int         `json:"etcdCount"`
-	MasterCount  int         `json:"masterCount"`
-	WorkerCount  int         `json:"workerCount"`
-	IngressCount int         `json:"ingressCount"`
-	Provisioner  Provisioner `json:"provisioner"`
+	Name         string            `json:"name"`
+	DesiredState string            `json:"desiredState"`
+	EtcdCount    int               `json:"etcdCount"`
+	MasterCount  int               `json:"masterCount"`
+	WorkerCount  int               `json:"workerCount"`
+	IngressCount int               `json:"ingressCount"`
+	Provisioner  store.Provisioner `json:"provisioner"`
 }
 
 // The Provisioner defines the infrastructure provisioner that should be used
 // for hosting the cluster
-type Provisioner struct {
-	// Options: aws
+type sanitizedProvisioner struct {
 	Provider         string            `json:"provider"`
 	Options          map[string]string `json:"options"`
 	AllowDestruction bool              `json:"allowDestruction"`
+}
+
+// ClusterResponse is the cluster resource returned by the server
+type ClusterResponse struct {
+	Name         string               `json:"name"`
+	DesiredState string               `json:"desiredState"`
+	CurrentState string               `json:"currentState"`
+	ClusterIP    string               `json:"clusterIP"`
+	EtcdCount    int                  `json:"etcdCount"`
+	MasterCount  int                  `json:"masterCount"`
+	WorkerCount  int                  `json:"workerCount"`
+	IngressCount int                  `json:"ingressCount"`
+	Provisioner  sanitizedProvisioner `json:"provisioner"`
 }
 
 // Create a cluster as described in the request body's JSON payload.
@@ -149,15 +141,11 @@ func (api Clusters) Update(w http.ResponseWriter, r *http.Request, p httprouter.
 	// Update the fields that can be updated
 	fromStore.Spec.DesiredState = req.DesiredState
 	fromStore.Status.WaitingForManualRetry = false
+	fromStore.Spec.Provisioner.Options = req.Provisioner.Options // TODO: Figure out how to prevent user from changing specific options (for example, changing the region)
+	fromStore.Spec.Provisioner.Secrets = req.Provisioner.Secrets
 	fromStore.Spec.MasterCount = req.MasterCount
 	fromStore.Spec.WorkerCount = req.WorkerCount
 	fromStore.Spec.IngressCount = req.IngressCount
-
-	switch fromStore.Spec.Provisioner.Provider {
-	case "aws":
-		fromStore.Spec.Provisioner.Credentials.AWS.AccessKeyId = req.Provisioner.Options[awsOptionAccessKeyID]
-		fromStore.Spec.Provisioner.Credentials.AWS.SecretAccessKey = req.Provisioner.Options[awsOptionSecretAccessKey]
-	}
 
 	if err := putToStore(req.Name, *fromStore, api.Store); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -386,22 +374,7 @@ func buildStoreCluster(req ClusterRequest) store.Cluster {
 		MasterCount:  req.MasterCount,
 		WorkerCount:  req.WorkerCount,
 		IngressCount: req.IngressCount,
-		Provisioner: store.Provisioner{
-			Provider:         req.Provisioner.Provider,
-			AllowDestruction: req.Provisioner.AllowDestruction,
-		},
-	}
-	switch req.Provisioner.Provider {
-	case "aws":
-		spec.Provisioner.Credentials = store.ProvisionerCredentials{
-			AWS: store.AWSCredentials{
-				AccessKeyId:     req.Provisioner.Options[awsOptionAccessKeyID],
-				SecretAccessKey: req.Provisioner.Options[awsOptionSecretAccessKey],
-			},
-		}
-		spec.Provisioner.Options.AWS = store.AWSProvisionerOptions{
-			Region: req.Provisioner.Options[awsOptionRegion],
-		}
+		Provisioner:  req.Provisioner,
 	}
 	return store.Cluster{
 		Spec: spec,
@@ -409,15 +382,6 @@ func buildStoreCluster(req ClusterRequest) store.Cluster {
 }
 
 func buildResponse(name string, sc store.Cluster) ClusterResponse {
-	provisioner := Provisioner{
-		Provider: sc.Spec.Provisioner.Provider,
-	}
-	switch provisioner.Provider {
-	case "aws":
-		provisioner.Options = map[string]string{
-			awsOptionRegion: sc.Spec.Provisioner.Options.AWS.Region,
-		}
-	}
 	return ClusterResponse{
 		Name:         name,
 		DesiredState: sc.Spec.DesiredState,
@@ -425,7 +389,10 @@ func buildResponse(name string, sc store.Cluster) ClusterResponse {
 		MasterCount:  sc.Spec.MasterCount,
 		WorkerCount:  sc.Spec.WorkerCount,
 		IngressCount: sc.Spec.IngressCount,
-		Provisioner:  provisioner,
+		Provisioner: sanitizedProvisioner{
+			Provider: sc.Spec.Provisioner.Provider,
+			Options:  sc.Spec.Provisioner.Options,
+		},
 		CurrentState: sc.Status.CurrentState,
 		ClusterIP:    sc.Status.ClusterIP,
 	}

@@ -6,7 +6,9 @@ variable "private_ssh_key_path" {}
 
 variable "public_ssh_key_path" {}
 
-variable "ssh_user" {}
+variable "ssh_user" {
+  default = "ubuntu"
+}
 
 variable "kismatic_version" {}
 

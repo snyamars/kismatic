@@ -2,10 +2,7 @@
 ## Index
 * [provisioner](#provisioner)
   * [provider](#provisionerprovider)
-  * [aws_options](#provisioneraws_options)
-    * [region](#provisioneraws_optionsregion)
-  * [azure_options](#provisionerazure_options)
-    * [location](#provisionerazure_optionslocation)
+  * [options](#provisioneroptions)
 * [cluster](#cluster)
   * [name](#clustername)
   * [admin_password _(deprecated)_](#clusteradmin_password-deprecated)
@@ -156,32 +153,14 @@
 | **Required** |  No |
 | **Default** | ` ` | 
 
-###  provisioner.aws_options
+###  provisioner.options
 
- AWS specific options. Only set if using "aws" provider 
-
-###  provisioner.aws_options.region
-
- The AWS region to deploy in 
+ The options that apply to the chosen infrastructure provider. 
 
 | | |
 |----------|-----------------|
-| **Kind** |  string |
-| **Required** |  Yes |
-| **Default** | ` ` | 
-
-###  provisioner.azure_options
-
- Azure specific options. Only set if using "azure" provider 
-
-###  provisioner.azure_options.location
-
- The Azure region to deploy in 
-
-| | |
-|----------|-----------------|
-| **Kind** |  string |
-| **Required** |  Yes |
+| **Kind** |  map[string]string |
+| **Required** |  No |
 | **Default** | ` ` | 
 
 ##  cluster

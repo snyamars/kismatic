@@ -36,6 +36,7 @@ type multiClusterController struct {
 	log                *log.Logger
 	newExecutor        ExecutorCreator
 	provisionerCreator ProvisionerCreator
+	planner            Planner
 	clusterStore       store.ClusterStore
 	reconcileFreq      time.Duration
 	clusterControllers map[string]chan<- struct{}
@@ -161,6 +162,7 @@ func (mcc multiClusterController) newClusterController(clusterName string, clust
 		clusterSpec:      cluster.Spec,
 		clusterAssetsDir: clusterAssetsDir,
 		logFile:          logFile,
+		planner:          mcc.planner,
 		executor:         executor,
 		clusterStore:     mcc.clusterStore,
 		newProvisioner:   mcc.provisionerCreator,

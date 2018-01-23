@@ -1,0 +1,3 @@
+version: v1
+environmentVariables:
+  token: "DIGITALOCEAN_TOKEN"

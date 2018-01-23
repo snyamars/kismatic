@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/provision"
 	"github.com/apprenda/kismatic/pkg/store"
-	"github.com/blang/semver"
 )
 
 // The ClusterController manages the lifecycle of clusters
@@ -25,7 +23,7 @@ type ExecutorCreator func(clusterName, clusterAssetsDir string, logFile io.Write
 
 // ProvisionerCreator creates provisioners that can be used for standing up
 // infrastructure for a specific cluster.
-type ProvisionerCreator func(cluster store.Cluster, output io.Writer) provision.Provisioner
+type ProvisionerCreator func(output io.Writer) provision.Provisioner
 
 // AssetsDir is the location where the controller will store all file-based
 // assets that are generated throughout the management of all clusters.
@@ -39,6 +37,7 @@ func (ad AssetsDir) ForCluster(clusterName string) string {
 // New returns a cluster controller
 func New(
 	logger *log.Logger,
+	planner Planner,
 	execCreator ExecutorCreator,
 	provisionerCreator ProvisionerCreator,
 	cs store.ClusterStore,
@@ -47,6 +46,7 @@ func New(
 	return &multiClusterController{
 		assetsDir:          assetsDir,
 		log:                logger,
+		planner:            planner,
 		newExecutor:        execCreator,
 		clusterStore:       cs,
 		reconcileFreq:      reconFreq,
@@ -70,27 +70,5 @@ func DefaultExecutorCreator() ExecutorCreator {
 			return nil, err
 		}
 		return executor, nil
-	}
-}
-
-// TerraformProvisionerCreator uses terraform for provisioning infrastructure
-// on the clouds we support.
-func TerraformProvisionerCreator(binaryPath string, kismaticVersion semver.Version) ProvisionerCreator {
-	return func(cluster store.Cluster, output io.Writer) provision.Provisioner {
-		switch cluster.Spec.Provisioner.Provider {
-		case "aws":
-			p := provision.AWS{
-				AccessKeyID:     cluster.Spec.Provisioner.Credentials.AWS.AccessKeyId,
-				SecretAccessKey: cluster.Spec.Provisioner.Credentials.AWS.SecretAccessKey,
-				Terraform: provision.Terraform{
-					Output:          output,
-					BinaryPath:      binaryPath,
-					KismaticVersion: kismaticVersion,
-				},
-			}
-			return p
-		default:
-			panic(fmt.Sprintf("provider not supported: %q", cluster.Spec.Provisioner.Provider))
-		}
 	}
 }

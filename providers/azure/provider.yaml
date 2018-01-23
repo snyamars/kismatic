@@ -1,0 +1,6 @@
+version: v1
+environmentVariables:
+  tenantId: "ARM_TENANT_ID"
+  clientId: "ARM_CLIENT_ID"
+  clientSecret: "ARM_CLIENT_SECRET"
+  subscriptionId: "ARM_SUBSCRIPTION_ID"

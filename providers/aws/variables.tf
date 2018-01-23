@@ -16,6 +16,7 @@ variable "public_ssh_key_path" {
 
 variable "ssh_user" {
   description = "The SSH user that should be used for accessing the nodes over SSH"
+  default = "ubuntu"
 }
 
 variable "kismatic_version" {}

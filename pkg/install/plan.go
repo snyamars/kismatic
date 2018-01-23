@@ -316,12 +316,12 @@ func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 
 	p.Provisioner.Provider = templateOpts.InfrastructureProvisioner
 	// set provisioner's provider specific options
-	switch templateOpts.InfrastructureProvisioner {
-	case "aws":
-		p.Provisioner.AWSOptions = &AWSProvisionerOptions{}
-	case "azure":
-		p.Provisioner.AzureOptions = &AzureProvisionerOptions{}
-	}
+	// switch templateOpts.InfrastructureProvisioner {
+	// case "aws":
+	// 	p.Provisioner.AWSOptions = &AWSProvisionerOptions{}
+	// case "azure":
+	// 	p.Provisioner.AzureOptions = &AzureProvisionerOptions{}
+	// }
 
 	// Set Networking defaults
 	p.Cluster.Networking.PodCIDRBlock = "172.16.0.0/16"

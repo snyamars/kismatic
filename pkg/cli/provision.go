@@ -29,59 +29,29 @@ func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comm
 			if err != nil {
 				return err
 			}
-			//Get the user's name for cluster tagging
 			user, err := user.Current()
 			if err != nil {
 				return err
 			}
-			tf := provision.Terraform{
-				Output:          out,
-				BinaryPath:      filepath.Join(path, "terraform/bin/terraform"),
+
+			tf := provision.AnyTerraform{
 				ClusterOwner:    user.Username,
-				KismaticVersion: install.KismaticVersion,
+				Output:          out,
+				BinaryPath:      filepath.Join(path, "terraform"),
+				KismaticVersion: install.KismaticVersion.String(),
+				ProvidersDir:    filepath.Join(path, "providers"),
+				StateDir:        filepath.Join(path, assetsFolder),
+				SecretsGetter:   environmentSecretsGetter{},
 			}
-			switch plan.Provisioner.Provider {
-			case "aws":
-				access := os.Getenv("AWS_ACCESS_KEY_ID")
-				secret := os.Getenv("AWS_SECRET_ACCESS_KEY")
-				aws := provision.AWS{
-					Terraform:       tf,
-					AccessKeyID:     access,
-					SecretAccessKey: secret,
-				}
-				updatedPlan, err := aws.Provision(*plan, provisionOpts)
-				if err != nil {
-					return err
-				}
-				if err := fp.Write(updatedPlan); err != nil {
-					return fmt.Errorf("error writing updated plan file to %s: %v", opts.planFilename, err)
-				}
-				return nil
-			case "azure":
-				subID := os.Getenv("ARM_SUBSCRIPTION_ID")
-				cID := os.Getenv("ARM_CLIENT_ID")
-				cSecret := os.Getenv("ARM_CLIENT_SECRET")
-				tID := os.Getenv("ARM_TENANT_ID")
-				azure := provision.Azure{
-					Terraform:      tf,
-					SubscriptionID: subID,
-					ClientID:       cID,
-					ClientSecret:   cSecret,
-					TenantID:       tID,
-				}
-				updatedPlan, err := azure.Provision(*plan, provisionOpts)
-				if err != nil {
-					return err
-				}
-				if err := fp.Write(updatedPlan); err != nil {
-					return fmt.Errorf("error writing updated plan file to %s: %v", opts.planFilename, err)
-				}
-				return nil
-			case "":
-				return fmt.Errorf("provider cannot be empty")
-			default:
-				return fmt.Errorf("provider %s not yet supported", plan.Provisioner.Provider)
+
+			updatedPlan, err := tf.Provision(*plan, provisionOpts)
+			if err != nil {
+				return err
 			}
+			if err := fp.Write(updatedPlan); err != nil {
+				return fmt.Errorf("error writing updated plan file to %s: %v", opts.planFilename, err)
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&provisionOpts.AllowDestruction, "allow-destruction", false, "Allows possible infrastructure destruction through provisioner planning, required if mutation is scaling down (Use with care)")
@@ -103,40 +73,37 @@ func NewCmdDestroy(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comman
 			if err != nil {
 				return err
 			}
-			tf := provision.Terraform{
-				Output:     out,
-				BinaryPath: filepath.Join(path, "terraform/bin/terraform"),
-			}
-			switch plan.Provisioner.Provider {
-			case "aws":
-				access := os.Getenv("AWS_ACCESS_KEY_ID")
-				secret := os.Getenv("AWS_SECRET_ACCESS_KEY")
-				aws := provision.AWS{
-					Terraform:       tf,
-					AccessKeyID:     access,
-					SecretAccessKey: secret,
-				}
-				return aws.Destroy(plan.Cluster.Name)
-			case "azure":
-				subID := os.Getenv("ARM_SUBSCRIPTION_ID")
-				cID := os.Getenv("ARM_CLIENT_ID")
-				cSecret := os.Getenv("ARM_CLIENT_SECRET")
-				tID := os.Getenv("ARM_TENANT_ID")
-				azure := provision.Azure{
-					Terraform:      tf,
-					SubscriptionID: subID,
-					ClientID:       cID,
-					ClientSecret:   cSecret,
-					TenantID:       tID,
-				}
-				return azure.Destroy(plan.Cluster.Name)
-			case "":
-				return fmt.Errorf("provider cannot be empty")
-			default:
-				return fmt.Errorf("provider %s not yet supported", plan.Provisioner.Provider)
+			tf := provision.AnyTerraform{
+				Output:          out,
+				BinaryPath:      filepath.Join(path, "./terraform"),
+				KismaticVersion: install.KismaticVersion.String(),
+				ProvidersDir:    filepath.Join(path, "providers"),
+				StateDir:        filepath.Join(path, assetsFolder),
+				SecretsGetter:   environmentSecretsGetter{},
 			}
 
+			return tf.Destroy(plan.Provisioner.Provider, plan.Cluster.Name)
 		},
 	}
 	return cmd
+}
+
+type environmentSecretsGetter struct{}
+
+// GetAsEnvironmentVariables returns a slice of the expected environment
+// variables sourcing them from the current process' environment.
+func (environmentSecretsGetter) GetAsEnvironmentVariables(clusterName string, expected map[string]string) ([]string, error) {
+	var vars []string
+	var missingVars []string
+	for _, expectedEnvVar := range expected {
+		val := os.Getenv(expectedEnvVar)
+		if val == "" {
+			missingVars = append(missingVars, expectedEnvVar)
+		}
+		vars = append(vars, fmt.Sprintf("%s=%s", expectedEnvVar, val))
+	}
+	if len(missingVars) > 0 {
+		return nil, fmt.Errorf("%v", missingVars)
+	}
+	return vars, nil
 }
