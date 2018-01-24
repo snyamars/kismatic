@@ -23,8 +23,8 @@
     yum_repository:
       name: gluster
       description: Gluster 3.8
-      baseurl: "http://buildlogs.centos.org/centos/7/storage/x86_64/gluster-3.8/"
-      gpgkey: "https://download.gluster.org/pub/gluster/glusterfs/3.8/3.8.7/rsa.pub"
+      baseurl: "https://buildlogs.centos.org/centos/7/storage/x86_64/gluster-3.12/"
+      gpgkey: "https://download.gluster.org/pub/gluster/glusterfs/3.12/rsa.pub"
       gpgcheck: yes
     when: ansible_os_family == 'RedHat' and 'storage' in group_names
     environment: "{{proxy_env}}"
@@ -72,7 +72,7 @@
 
   - name: add Gluster deb repository
     apt_repository:
-      repo: ppa:gluster/glusterfs-3.8
+      repo: ppa:gluster/glusterfs-3.12
       update_cache: yes
     when: ansible_os_family == 'Debian' and 'storage' in group_names
     environment: "{{proxy_env}}"
