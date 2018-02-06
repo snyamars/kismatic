@@ -26,6 +26,10 @@ func (e dummyExec) RunPreFlightCheck(*install.Plan) error {
 	return nil
 }
 
+func (e dummyExec) RunNewNodePreFlightCheck(install.Plan, install.Node) error {
+	panic("not implemented")
+}
+
 func (e dummyExec) CopyInspector(*install.Plan) error {
 	return nil
 }
@@ -50,7 +54,7 @@ func (e dummyExec) RunSmokeTest(*install.Plan) error {
 	return nil
 }
 
-func (e dummyExec) AddWorker(*install.Plan, install.Node, bool) (*install.Plan, error) {
+func (e dummyExec) AddNode(p *install.Plan, newNode install.Node, roles []string, restartServices bool) (*install.Plan, error) {
 	panic("not implemented")
 }
 

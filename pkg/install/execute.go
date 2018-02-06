@@ -21,20 +21,19 @@ import (
 // environment defined in the plan file
 type PreFlightExecutor interface {
 	RunPreFlightCheck(*Plan) error
-	CopyInspector(*Plan) error
-	RunNewWorkerPreFlightCheck(Plan, Node) error
+	RunNewNodePreFlightCheck(Plan, Node) error
 	RunUpgradePreFlightCheck(*Plan, ListableNode) error
 }
 
 // The Executor will carry out the installation plan
 type Executor interface {
 	PreFlightExecutor
-	Install(p *Plan, restartServices bool) error
+	Install(plan *Plan, restartServices bool) error
 	GenerateCertificates(p *Plan, useExistingCA bool) error
 	GenerateKubeconfig(p Plan) error
 	RunSmokeTest(*Plan) error
-	AddWorker(*Plan, Node, bool) (*Plan, error)
-	RunPlay(name string, p *Plan, restartServices bool) error
+	AddNode(Plan *Plan, node Node, roles []string, restartServices bool) (*Plan, error)
+	RunPlay(name string, plan *Plan, restartServices bool) error
 	AddVolume(*Plan, StorageVolume) error
 	DeleteVolume(*Plan, string) error
 	UpgradeNodes(plan Plan, nodesToUpgrade []ListableNode, onlineUpgrade bool, maxParallelWorkers int, restartServices bool) error
@@ -324,7 +323,6 @@ func (ae *ansibleExecutor) RunPreFlightCheck(p *Plan) error {
 	if err != nil {
 		return err
 	}
-	cc = setPreflightOptions(*p, *cc)
 	t := task{
 		name:           "preflight",
 		playbook:       "preflight.yaml",
@@ -336,38 +334,28 @@ func (ae *ansibleExecutor) RunPreFlightCheck(p *Plan) error {
 	return ae.execute(t)
 }
 
-// RunInspector against the nodes defined in the plan
-func (ae *ansibleExecutor) CopyInspector(p *Plan) error {
-	cc, err := ae.buildClusterCatalog(p)
-	if err != nil {
-		return err
-	}
-	cc = setPreflightOptions(*p, *cc)
+// RunNewNodePreFlightCheck runs the preflight checks against a new node
+func (ae *ansibleExecutor) RunNewNodePreFlightCheck(p Plan, node Node) error {
+	cc, err := ae.buildClusterCatalog(&p)
 	if err != nil {
 		return err
 	}
 	t := task{
 		name:           "copy-inspector",
 		playbook:       "copy-inspector.yaml",
-		inventory:      buildInventoryFromPlan(p),
+		inventory:      buildInventoryFromPlan(&p),
 		clusterCatalog: *cc,
 		explainer:      ae.preflightExplainer(),
-		plan:           *p,
+		plan:           p,
 	}
-	return ae.execute(t)
-}
-
-// RunNewWorkerPreFlightCheck runs the preflight checks against a new worker node
-func (ae *ansibleExecutor) RunNewWorkerPreFlightCheck(p Plan, node Node) error {
-	cc, err := ae.buildClusterCatalog(&p)
-	if err != nil {
+	if err := ae.execute(t); err != nil {
 		return err
 	}
-	cc = setPreflightOptions(p, *cc)
+
 	p.Worker.ExpectedCount++
 	p.Worker.Nodes = append(p.Worker.Nodes, node)
-	t := task{
-		name:           "add-worker-preflight",
+	t = task{
+		name:           "add-node-preflight",
 		playbook:       "preflight.yaml",
 		inventory:      buildInventoryFromPlan(&p),
 		clusterCatalog: *cc,
@@ -384,8 +372,18 @@ func (ae *ansibleExecutor) RunUpgradePreFlightCheck(p *Plan, node ListableNode) 
 	if err != nil {
 		return err
 	}
-	cc = setPreflightOptions(*p, *cc)
 	t := task{
+		name:           "copy-inspector",
+		playbook:       "copy-inspector.yaml",
+		inventory:      buildInventoryFromPlan(p),
+		clusterCatalog: *cc,
+		explainer:      ae.preflightExplainer(),
+		plan:           *p,
+	}
+	if err := ae.execute(t); err != nil {
+		return err
+	}
+	t = task{
 		name:           "upgrade-preflight",
 		playbook:       "upgrade-preflight.yaml",
 		explainer:      ae.preflightExplainer(),
@@ -395,12 +393,6 @@ func (ae *ansibleExecutor) RunUpgradePreFlightCheck(p *Plan, node ListableNode) 
 		limit:          []string{node.Node.Host},
 	}
 	return ae.execute(t)
-}
-
-func setPreflightOptions(p Plan, cc ansible.ClusterCatalog) *ansible.ClusterCatalog {
-	cc.KismaticPreflightCheckerLinux = filepath.Join("inspector", "linux", "amd64", "kismatic-inspector")
-	cc.EnablePackageInstallation = !p.Cluster.DisablePackageInstallation
-	return &cc
 }
 
 func (ae *ansibleExecutor) RunPlay(playName string, p *Plan, restartServices bool) error {
@@ -666,25 +658,31 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 	}
 
 	cc := ansible.ClusterCatalog{
-		ClusterName:                  p.Cluster.Name,
-		AdminPassword:                p.Cluster.AdminPassword,
-		TLSDirectory:                 tlsDir,
-		ServicesCIDR:                 p.Cluster.Networking.ServiceCIDRBlock,
-		PodCIDR:                      p.Cluster.Networking.PodCIDRBlock,
-		DNSServiceIP:                 dnsIP,
-		EnableModifyHosts:            p.Cluster.Networking.UpdateHostsFiles,
-		EnablePackageInstallation:    !p.Cluster.DisablePackageInstallation,
-		KuberangPath:                 filepath.Join("kuberang", "linux", "amd64", "kuberang"),
-		DisconnectedInstallation:     p.Cluster.DisconnectedInstallation,
-		HTTPProxy:                    p.Cluster.Networking.HTTPProxy,
-		HTTPSProxy:                   p.Cluster.Networking.HTTPSProxy,
-		TargetVersion:                KismaticVersion.String(),
-		APIServerOptions:             p.Cluster.APIServerOptions.Overrides,
-		KubeControllerManagerOptions: p.Cluster.KubeControllerManagerOptions.Overrides,
-		KubeSchedulerOptions:         p.Cluster.KubeSchedulerOptions.Overrides,
-		KubeProxyOptions:             p.Cluster.KubeProxyOptions.Overrides,
-		KubeletOptions:               p.Cluster.KubeletOptions.Overrides,
+		ClusterName:                   p.Cluster.Name,
+		AdminPassword:                 p.Cluster.AdminPassword,
+		TLSDirectory:                  tlsDir,
+		ServicesCIDR:                  p.Cluster.Networking.ServiceCIDRBlock,
+		PodCIDR:                       p.Cluster.Networking.PodCIDRBlock,
+		DNSServiceIP:                  dnsIP,
+		EnableModifyHosts:             p.Cluster.Networking.UpdateHostsFiles,
+		EnablePackageInstallation:     !p.Cluster.DisablePackageInstallation,
+		KismaticPreflightCheckerLinux: filepath.Join("inspector", "linux", "amd64", "kismatic-inspector"),
+		KuberangPath:                  filepath.Join("kuberang", "linux", "amd64", "kuberang"),
+		DisconnectedInstallation:      p.Cluster.DisconnectedInstallation,
+		HTTPProxy:                     p.Cluster.Networking.HTTPProxy,
+		HTTPSProxy:                    p.Cluster.Networking.HTTPSProxy,
+		TargetVersion:                 KismaticVersion.String(),
+		APIServerOptions:              p.Cluster.APIServerOptions.Overrides,
+		KubeControllerManagerOptions:  p.Cluster.KubeControllerManagerOptions.Overrides,
+		KubeSchedulerOptions:          p.Cluster.KubeSchedulerOptions.Overrides,
+		KubeProxyOptions:              p.Cluster.KubeProxyOptions.Overrides,
+		KubeletOptions:                p.Cluster.KubeletOptions.Overrides,
 	}
+
+	// set versions
+	cc.Versions.Kubernetes = p.Cluster.Version
+	cc.Versions.KubernetesYum = p.Cluster.Version[1:] + "-0"
+	cc.Versions.KubernetesDeb = p.Cluster.Version[1:] + "-00"
 
 	cc.NoProxy = p.AllAddresses()
 	if p.Cluster.Networking.NoProxy != "" {
@@ -715,13 +713,22 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 	}
 
 	// Setup docker options
+	cc.Docker.Enabled = !p.Docker.Disable
 	cc.Docker.Logs.Driver = p.Docker.Logs.Driver
 	cc.Docker.Logs.Opts = p.Docker.Logs.Opts
-
-	cc.Docker.Storage.DirectLVM.Enabled = p.Docker.Storage.DirectLVM.Enabled
-	if cc.Docker.Storage.DirectLVM.Enabled {
-		cc.Docker.Storage.DirectLVM.BlockDevice = p.Docker.Storage.DirectLVM.BlockDevice
-		cc.Docker.Storage.DirectLVM.EnableDeferredDeletion = p.Docker.Storage.DirectLVM.EnableDeferredDeletion
+	cc.Docker.Storage.Driver = p.Docker.Storage.Driver
+	cc.Docker.Storage.Opts = p.Docker.Storage.Opts
+	cc.Docker.Storage.OptsList = []string{}
+	// A formatted list to set in docker daemon.json
+	for k, v := range p.Docker.Storage.Opts {
+		cc.Docker.Storage.OptsList = append(cc.Docker.Storage.OptsList, fmt.Sprintf("%s=%s", k, v))
+	}
+	cc.Docker.Storage.DirectLVMBlockDevice = ansible.DirectLVMBlockDevice{
+		Path:                        p.Docker.Storage.DirectLVMBlockDevice.Path,
+		ThinpoolPercent:             p.Docker.Storage.DirectLVMBlockDevice.ThinpoolPercent,
+		ThinpoolMetaPercent:         p.Docker.Storage.DirectLVMBlockDevice.ThinpoolMetaPercent,
+		ThinpoolAutoextendThreshold: p.Docker.Storage.DirectLVMBlockDevice.ThinpoolAutoextendThreshold,
+		ThinpoolAutoextendPercent:   p.Docker.Storage.DirectLVMBlockDevice.ThinpoolAutoextendPercent,
 	}
 
 	if p.Ingress.Nodes != nil && len(p.Ingress.Nodes) > 0 {
@@ -760,6 +767,7 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 
 	// DNS
 	cc.DNS.Enabled = !p.AddOns.DNS.Disable
+	cc.DNS.Provider = p.AddOns.DNS.Provider
 
 	// heapster
 	if p.AddOns.HeapsterMonitoring != nil && !p.AddOns.HeapsterMonitoring.Disable {
@@ -785,6 +793,7 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 		default:
 			cc.Helm.Enabled = true
 		}
+		cc.Helm.Namespace = p.AddOns.PackageManager.Options.Helm.Namespace
 	}
 
 	cc.Rescheduler.Enabled = !p.AddOns.Rescheduler.Disable

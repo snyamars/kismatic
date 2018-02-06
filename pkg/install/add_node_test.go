@@ -12,14 +12,14 @@ import (
 )
 
 func mustGetTempDir(t *testing.T) string {
-	dir, err := ioutil.TempDir("", "add-worker-test")
+	dir, err := ioutil.TempDir("", "add-node-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	return dir
 }
 
-func TestAddWorkerCertMissingCAMissing(t *testing.T) {
+func TestAddNodeCertMissingCAMissing(t *testing.T) {
 	e := ansibleExecutor{
 		options:             ExecutorOptions{RunsDirectory: mustGetTempDir(t)},
 		stdout:              ioutil.Discard,
@@ -32,18 +32,18 @@ func TestAddWorkerCertMissingCAMissing(t *testing.T) {
 			Nodes: []Node{},
 		},
 	}
-	newWorker := Node{}
-	newPlan, err := e.AddWorker(originalPlan, newWorker, true)
+	newNode := Node{}
+	newPlan, err := e.AddNode(originalPlan, newNode, []string{"worker"}, true)
 	if newPlan != nil {
 		t.Errorf("add worker returned an updated plan")
 	}
 	if err != errMissingClusterCA {
-		t.Errorf("AddWorker did not return the expected error. Instead returned: %v", err)
+		t.Errorf("AddNode did not return the expected error. Instead returned: %v", err)
 	}
 }
 
 // Verify that cert gets generated
-func TestAddWorkerCertMissingCAExists(t *testing.T) {
+func TestAddNodeCertMissingCAExists(t *testing.T) {
 	pki := &fakePKI{
 		caExists: true,
 	}
@@ -63,13 +63,14 @@ func TestAddWorkerCertMissingCAExists(t *testing.T) {
 			Nodes: []Node{},
 		},
 		Cluster: Cluster{
+			Version: "v1.9.2",
 			Networking: NetworkConfig{
 				ServiceCIDRBlock: "10.0.0.0/16",
 			},
 		},
 	}
-	newWorker := Node{}
-	_, err := e.AddWorker(originalPlan, newWorker, true)
+	newNode := Node{}
+	_, err := e.AddNode(originalPlan, newNode, []string{"worker"}, true)
 	if err != nil {
 		t.Errorf("unexpected error while adding worker: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestAddWorkerCertMissingCAExists(t *testing.T) {
 	}
 }
 
-func TestAddWorkerPlanIsUpdated(t *testing.T) {
+func TestAddNodePlanIsUpdated(t *testing.T) {
 	e := ansibleExecutor{
 		options:             ExecutorOptions{RunsDirectory: mustGetTempDir(t)},
 		stdout:              ioutil.Discard,
@@ -105,33 +106,245 @@ func TestAddWorkerPlanIsUpdated(t *testing.T) {
 			},
 		},
 		Cluster: Cluster{
+			Version: "v1.9.2",
 			Networking: NetworkConfig{
 				ServiceCIDRBlock: "10.0.0.0/16",
 			},
 		},
 	}
-	newWorker := Node{
+	newNode := Node{
 		Host: "test",
 	}
-	updatedPlan, err := e.AddWorker(originalPlan, newWorker, true)
+	updatedPlan, err := e.AddNode(originalPlan, newNode, []string{"worker"}, true)
 	if err != nil {
 		t.Errorf("unexpected error while adding worker: %v", err)
 	}
 	if updatedPlan.Worker.ExpectedCount != 2 {
 		t.Errorf("expected count was not incremented")
 	}
+	if updatedPlan.Ingress.ExpectedCount != 0 {
+		t.Errorf("expected ingress count was not 0")
+	}
+	if updatedPlan.Storage.ExpectedCount != 0 {
+		t.Errorf("expected storage count was not 0")
+	}
 	found := false
 	for _, w := range updatedPlan.Worker.Nodes {
-		if w.Equal(newWorker) {
+		if w.Equal(newNode) {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("the updated plan does not include the new worker")
+		t.Errorf("the updated plan does not include the new node")
 	}
 }
 
-func TestAddWorkerPlanNotUpdatedAfterFailure(t *testing.T) {
+func TestAddIngressPlanIsUpdated(t *testing.T) {
+	e := ansibleExecutor{
+		options:             ExecutorOptions{RunsDirectory: mustGetTempDir(t)},
+		stdout:              ioutil.Discard,
+		consoleOutputFormat: ansible.RawFormat,
+		pki: &fakePKI{
+			caExists: true,
+		},
+		runnerExplainerFactory: fakeRunnerExplainer(nil),
+		certsDir:               mustGetTempDir(t),
+	}
+	originalPlan := &Plan{
+		Master: MasterNodeGroup{
+			Nodes: []Node{{InternalIP: "10.10.2.20"}},
+		},
+		Ingress: OptionalNodeGroup{
+			ExpectedCount: 1,
+			Nodes: []Node{
+				{
+					Host: "existingWorker",
+				},
+			},
+		},
+		Cluster: Cluster{
+			Version: "v1.9.2",
+			Networking: NetworkConfig{
+				ServiceCIDRBlock: "10.0.0.0/16",
+			},
+		},
+	}
+	newNode := Node{
+		Host: "test",
+	}
+	updatedPlan, err := e.AddNode(originalPlan, newNode, []string{"ingress"}, true)
+	if err != nil {
+		t.Errorf("unexpected error while adding worker: %v", err)
+	}
+	if updatedPlan.Ingress.ExpectedCount != 2 {
+		t.Errorf("expected count was not incremented")
+	}
+	if updatedPlan.Worker.ExpectedCount != 0 {
+		t.Errorf("expected worker count was not 0")
+	}
+	if updatedPlan.Storage.ExpectedCount != 0 {
+		t.Errorf("expected storage count was not 0")
+	}
+	found := false
+	for _, w := range updatedPlan.Ingress.Nodes {
+		if w.Equal(newNode) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the updated plan does not include the new node")
+	}
+}
+
+func TestAddStoragePlanIsUpdated(t *testing.T) {
+	e := ansibleExecutor{
+		options:             ExecutorOptions{RunsDirectory: mustGetTempDir(t)},
+		stdout:              ioutil.Discard,
+		consoleOutputFormat: ansible.RawFormat,
+		pki: &fakePKI{
+			caExists: true,
+		},
+		runnerExplainerFactory: fakeRunnerExplainer(nil),
+		certsDir:               mustGetTempDir(t),
+	}
+	originalPlan := &Plan{
+		Master: MasterNodeGroup{
+			Nodes: []Node{{InternalIP: "10.10.2.20"}},
+		},
+		Storage: OptionalNodeGroup{
+			ExpectedCount: 1,
+			Nodes: []Node{
+				{
+					Host: "existingWorker",
+				},
+			},
+		},
+		Cluster: Cluster{
+			Version: "v1.9.2",
+			Networking: NetworkConfig{
+				ServiceCIDRBlock: "10.0.0.0/16",
+			},
+		},
+	}
+	newNode := Node{
+		Host: "test",
+	}
+	updatedPlan, err := e.AddNode(originalPlan, newNode, []string{"storage"}, true)
+	if err != nil {
+		t.Errorf("unexpected error while adding worker: %v", err)
+	}
+	if updatedPlan.Storage.ExpectedCount != 2 {
+		t.Errorf("expected count was not incremented")
+	}
+	if updatedPlan.Worker.ExpectedCount != 0 {
+		t.Errorf("expected worker count was not 0")
+	}
+	if updatedPlan.Ingress.ExpectedCount != 0 {
+		t.Errorf("expected ingress count was not 0")
+	}
+	found := false
+	for _, w := range updatedPlan.Storage.Nodes {
+		if w.Equal(newNode) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the updated plan does not include the new node")
+	}
+}
+
+func TestAddAllRolesPlanIsUpdated(t *testing.T) {
+	e := ansibleExecutor{
+		options:             ExecutorOptions{RunsDirectory: mustGetTempDir(t)},
+		stdout:              ioutil.Discard,
+		consoleOutputFormat: ansible.RawFormat,
+		pki: &fakePKI{
+			caExists: true,
+		},
+		runnerExplainerFactory: fakeRunnerExplainer(nil),
+		certsDir:               mustGetTempDir(t),
+	}
+	originalPlan := &Plan{
+		Master: MasterNodeGroup{
+			Nodes: []Node{{InternalIP: "10.10.2.20"}},
+		},
+		Worker: NodeGroup{
+			ExpectedCount: 1,
+			Nodes: []Node{
+				{
+					Host: "existingWorker",
+				},
+			},
+		},
+		Ingress: OptionalNodeGroup{
+			ExpectedCount: 1,
+			Nodes: []Node{
+				{
+					Host: "existingWorker",
+				},
+			},
+		},
+		Storage: OptionalNodeGroup{
+			ExpectedCount: 1,
+			Nodes: []Node{
+				{
+					Host: "existingWorker",
+				},
+			},
+		},
+		Cluster: Cluster{
+			Version: "v1.9.2",
+			Networking: NetworkConfig{
+				ServiceCIDRBlock: "10.0.0.0/16",
+			},
+		},
+	}
+	newNode := Node{
+		Host: "test",
+	}
+	updatedPlan, err := e.AddNode(originalPlan, newNode, []string{"worker", "ingress", "storage"}, true)
+	if err != nil {
+		t.Errorf("unexpected error while adding worker: %v", err)
+	}
+	if updatedPlan.Worker.ExpectedCount != 2 {
+		t.Errorf("expected worker count was not incremented")
+	}
+	if updatedPlan.Ingress.ExpectedCount != 2 {
+		t.Errorf("expected ingress count was not incremented")
+	}
+	if updatedPlan.Storage.ExpectedCount != 2 {
+		t.Errorf("expected storage count was not incremented")
+	}
+	found := false
+	for _, w := range updatedPlan.Worker.Nodes {
+		if w.Equal(newNode) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the updated plan does not include the new worker node")
+	}
+	found = false
+	for _, w := range updatedPlan.Ingress.Nodes {
+		if w.Equal(newNode) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the updated plan does not include the new ingress node")
+	}
+	found = false
+	for _, w := range updatedPlan.Storage.Nodes {
+		if w.Equal(newNode) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the updated plan does not include the new storage node")
+	}
+}
+
+func TestAddNodePlanNotUpdatedAfterFailure(t *testing.T) {
 	e := ansibleExecutor{
 		options:             ExecutorOptions{RunsDirectory: mustGetTempDir(t)},
 		stdout:              ioutil.Discard,
@@ -155,15 +368,16 @@ func TestAddWorkerPlanNotUpdatedAfterFailure(t *testing.T) {
 			},
 		},
 		Cluster: Cluster{
+			Version: "v1.9.2",
 			Networking: NetworkConfig{
 				ServiceCIDRBlock: "10.0.0.0/16",
 			},
 		},
 	}
-	newWorker := Node{
+	newNode := Node{
 		Host: "test",
 	}
-	updatedPlan, err := e.AddWorker(originalPlan, newWorker, true)
+	updatedPlan, err := e.AddNode(originalPlan, newNode, []string{"worker"}, true)
 	if err == nil {
 		t.Errorf("expected an error, but didn't get one")
 	}
@@ -172,7 +386,7 @@ func TestAddWorkerPlanNotUpdatedAfterFailure(t *testing.T) {
 	}
 }
 
-func TestAddWorkerRestartServicesEnabled(t *testing.T) {
+func TestAddNodeRestartServicesEnabled(t *testing.T) {
 	fakeRunner := fakeRunner{}
 	e := ansibleExecutor{
 		certsDir:            mustGetTempDir(t),
@@ -199,15 +413,16 @@ func TestAddWorkerRestartServicesEnabled(t *testing.T) {
 			},
 		},
 		Cluster: Cluster{
+			Version: "v1.9.2",
 			Networking: NetworkConfig{
 				ServiceCIDRBlock: "10.0.0.0/16",
 			},
 		},
 	}
-	newWorker := Node{
+	newNode := Node{
 		Host: "test",
 	}
-	_, err := e.AddWorker(originalPlan, newWorker, true)
+	_, err := e.AddNode(originalPlan, newNode, []string{"worker"}, true)
 	if err != nil {
 		t.Errorf("unexpected error")
 	}
@@ -229,7 +444,7 @@ func TestAddWorkerRestartServicesEnabled(t *testing.T) {
 	}
 }
 
-func TestAddWorkerHostsFilesDNSEnabled(t *testing.T) {
+func TestAddNodeHostsFilesDNSEnabled(t *testing.T) {
 	fakeRunner := fakeRunner{}
 	e := ansibleExecutor{
 		options:             ExecutorOptions{RunsDirectory: mustGetTempDir(t)},
@@ -256,20 +471,21 @@ func TestAddWorkerHostsFilesDNSEnabled(t *testing.T) {
 			},
 		},
 		Cluster: Cluster{
+			Version: "v1.9.2",
 			Networking: NetworkConfig{
 				ServiceCIDRBlock: "10.0.0.0/16",
 				UpdateHostsFiles: true,
 			},
 		},
 	}
-	newWorker := Node{
+	newNode := Node{
 		Host: "test",
 	}
-	_, err := e.AddWorker(originalPlan, newWorker, false)
+	_, err := e.AddNode(originalPlan, newNode, []string{"worker"}, false)
 	if err != nil {
 		t.Errorf("unexpected error")
 	}
-	expectedPlaybook := "_hosts.yaml"
+	expectedPlaybook := "hosts.yaml"
 	found := false
 	for _, p := range fakeRunner.allNodesPlaybooks {
 		if p == expectedPlaybook {

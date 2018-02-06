@@ -184,7 +184,9 @@ func doUpgrade(in io.Reader, out io.Writer, opts *upgradeOpts) error {
 	var toUpgrade []install.ListableNode
 	var toSkip []install.ListableNode
 	for _, n := range cv.Nodes {
-		if install.IsOlderVersion(n.Version) {
+		// run if KET version or component versions are different
+		// don't check component versions if the node has only "etcd" role
+		if install.IsOlderVersion(n.Version) || (!(len(n.Roles) == 1 && n.Roles[0] == "etcd") && plan.Cluster.Version != n.ComponentVersions.Kubernetes) {
 			toUpgrade = append(toUpgrade, n)
 		} else {
 			toSkip = append(toSkip, n)
@@ -315,10 +317,6 @@ func upgradeNodes(in io.Reader, out io.Writer, plan install.Plan, opts upgradeOp
 	// Run upgrade preflight on the nodes that are to be upgraded
 	unreadyNodes := []install.ListableNode{}
 	if !opts.skipPreflight {
-		util.PrintHeader(out, fmt.Sprintf("Copy Kismatic Inspector to Nodes"), '=')
-		if err := preflightExec.CopyInspector(&plan); err != nil {
-			return errors.New("Error copying kismatic inspector")
-		}
 		for _, node := range nodesNeedUpgrade {
 			util.PrintHeader(out, fmt.Sprintf("Preflight Checks: %s %s", node.Node.Host, node.Roles), '=')
 			if err := preflightExec.RunUpgradePreFlightCheck(&plan, node); err != nil {

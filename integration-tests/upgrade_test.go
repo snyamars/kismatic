@@ -12,9 +12,9 @@ import (
 var _ = Describe("Upgrade", func() {
 
 	Describe("Upgrading a cluster using online mode", func() {
-		Context("From KET version v1.6.3", func() {
+		Context("From KET version v1.7.1", func() {
 			BeforeEach(func() {
-				dir := setupTestWorkingDirWithVersion("v1.6.3")
+				dir := setupTestWorkingDirWithVersion("v1.7.1")
 				os.Chdir(dir)
 			})
 
@@ -41,10 +41,10 @@ var _ = Describe("Upgrade", func() {
 			// This spec is open to modification when new assertions have to be made.
 			Context("Using a skunkworks cluster", func() {
 				ItOnAWS("should result in an upgraded cluster [slow] [upgrade]", func(aws infrastructureProvisioner) {
-					WithInfrastructureAndDNS(NodeCount{Etcd: 3, Master: 2, Worker: 3, Ingress: 2, Storage: 2}, Ubuntu1604LTS, aws, func(nodes provisionedNodes, sshKey string) {
+					WithInfrastructureAndDNS(NodeCount{Etcd: 3, Master: 2, Worker: 5, Ingress: 2, Storage: 2}, Ubuntu1604LTS, aws, func(nodes provisionedNodes, sshKey string) {
 						// reserve one of the workers for the add-worker test
 						allWorkers := nodes.worker
-						nodes.worker = allWorkers[0 : len(nodes.worker)-1]
+						nodes.worker = allWorkers[0 : len(nodes.worker)-3]
 
 						// Standup cluster with previous version
 						opts := installOptions{adminPassword: "abbazabba"}
@@ -65,8 +65,18 @@ var _ = Describe("Upgrade", func() {
 						})
 
 						sub.It("should allow adding a worker node", func() error {
-							newWorker := allWorkers[len(allWorkers)-1]
-							return addWorkerToCluster(newWorker, sshKey, []string{})
+							newNode := allWorkers[len(allWorkers)-1]
+							return addNodeToCluster(newNode, sshKey, []string{}, []string{})
+						})
+
+						sub.It("should allow adding a ingress node", func() error {
+							newNode := allWorkers[len(allWorkers)-2]
+							return addNodeToCluster(newNode, sshKey, []string{"com.integrationtest/worker=true"}, []string{"ingress"})
+						})
+
+						sub.It("should allow adding a storage node", func() error {
+							newNode := allWorkers[len(allWorkers)-3]
+							return addNodeToCluster(newNode, sshKey, []string{"com.integrationtest/worker=true"}, []string{"storage"})
 						})
 
 						sub.It("should be able to deploy a workload with ingress", func() error {
