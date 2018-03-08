@@ -8,7 +8,7 @@ import (
 var validPlan = Plan{
 	Cluster: Cluster{
 		Name:    "test",
-		Version: "v1.9.2",
+		Version: "v1.9.3",
 		Networking: NetworkConfig{
 			Type:             "overlay",
 			PodCIDRBlock:     "172.16.0.0/16",
@@ -121,7 +121,7 @@ func TestClusterVersion(t *testing.T) {
 	}{
 		{c: Cluster{
 			Name:    "test",
-			Version: "v1.9.2",
+			Version: "v1.9.3",
 			Networking: NetworkConfig{
 				Type:             "overlay",
 				PodCIDRBlock:     "172.16.0.0/16",
@@ -140,7 +140,7 @@ func TestClusterVersion(t *testing.T) {
 		},
 		{c: Cluster{
 			Name:    "test",
-			Version: "v1.9.2",
+			Version: "v1.9.3",
 			Networking: NetworkConfig{
 				Type:             "overlay",
 				PodCIDRBlock:     "172.16.0.0/16",
@@ -178,7 +178,7 @@ func TestClusterVersion(t *testing.T) {
 		},
 		{c: Cluster{
 			Name:    "test",
-			Version: "v1.9.200",
+			Version: "v1.9.300",
 			Networking: NetworkConfig{
 				Type:             "overlay",
 				PodCIDRBlock:     "172.16.0.0/16",
@@ -235,7 +235,7 @@ func TestClusterVersion(t *testing.T) {
 		},
 		{c: Cluster{
 			Name:                     "test",
-			Version:                  "v1.9.200",
+			Version:                  "v1.9.300",
 			DisconnectedInstallation: true,
 			Networking: NetworkConfig{
 				Type:             "overlay",
@@ -833,7 +833,11 @@ func TestValidatePlanCerts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error generating CA for test: %v", err)
 	}
-	if err := pki.GenerateClusterCertificates(&p, ca); err != nil {
+	proxyClientCA, err := pki.GenerateProxyClientCA(&p)
+	if err != nil {
+		t.Fatalf("error generating proxy-client CA for test: %v", err)
+	}
+	if err := pki.GenerateClusterCertificates(&p, ca, proxyClientCA); err != nil {
 		t.Fatalf("failed to generate certs: %v", err)
 	}
 
@@ -854,7 +858,11 @@ func TestValidatePlanBadCerts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error generating CA for test: %v", err)
 	}
-	if err := pki.GenerateClusterCertificates(&p, ca); err != nil {
+	proxyClientCA, err := pki.GenerateProxyClientCA(&p)
+	if err != nil {
+		t.Fatalf("error generating proxy-client CA for test: %v", err)
+	}
+	if err := pki.GenerateClusterCertificates(&p, ca, proxyClientCA); err != nil {
 		t.Fatalf("failed to generate certs: %v", err)
 	}
 	p.Master.Nodes[0] = Node{
@@ -892,7 +900,11 @@ func TestValidatePlanMissingSomeCerts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error generating CA for test: %v", err)
 	}
-	if err := pki.GenerateClusterCertificates(&p, ca); err != nil {
+	proxyClientCA, err := pki.GenerateProxyClientCA(&p)
+	if err != nil {
+		t.Fatalf("error generating proxy-client CA for test: %v", err)
+	}
+	if err := pki.GenerateClusterCertificates(&p, ca, proxyClientCA); err != nil {
 		t.Fatalf("failed to generate certs: %v", err)
 	}
 

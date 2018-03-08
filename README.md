@@ -4,8 +4,6 @@
 
 # Kismatic Enterprise Toolkit (KET): Design, Deployment and Operations System for Production Kubernetes Clusters
 
-Join our mailing list for updates on new releases: https://groups.google.com/forum/#!forum/kismatic-users
-
 <img src="https://github.com/apprenda/kismatic/raw/master/docs/logo/KET_logo.png" width="500" />
 
 ## Introduction
@@ -26,16 +24,17 @@ KET operational tools include:
 ## Components
 | Component | Version |
 | --- | --- |
-| Kubernetes | v1.9.2 |
+| Kubernetes | v1.9.3 |
 | Docker | v17.03.2.ce |
 | Etcd (for Kubernetes) | v3.1.10 |
 | Etcd (for Calico & Contiv) | v3.1.10 |
-| Calico | v2.6.6 |
-| Weave | v2.1.3 |
+| Calico | v2.6.8 |
+| Weave | v2.2.0 |
 | Contiv | v1.1.1 |
 | KubeDNS | 1.14.8 |
-| CoreDNS | 1.0.5 |
-| Nginx Ingress Controller | 0.10.2 |
+| CoreDNS | 1.0.6 |
+| Nginx Ingress Controller | 0.11.0 |
+| Helm | v2.8.1 |
 
 
 [Download KET here](https://github.com/apprenda/kismatic/releases)
@@ -98,6 +97,6 @@ KET automatically configures and deploys [Kubernetes Dashboard](http://kubernete
 
 Simply use the `kismatic dashboard` command to open the dashboard
 
-You may be prompted for credentials, use `admin` for the **User Name** and `%admin_password%` (from your `kismatic-cluster.yaml` file) for the **Password**.
+During installation Kismatic generates a [kubeconfig file](http://kubernetes.io/docs/user-guide/kubeconfig-file/) in `generated/dashboard-admin-kubeconfig` with admin access, use that file or [create your own](https://github.com/kubernetes/dashboard/wiki/Creating-sample-user) RBAC backed users to access the dashboard.
 
-The installer also generates a [kubeconfig file](http://kubernetes.io/docs/user-guide/kubeconfig-file/) required for [kubectl](http://kubernetes.io/docs/user-guide/kubectl-overview/). Instructions are provided at the end of the installation on how to use it.
+The installer also generates a [kubeconfig file](http://kubernetes.io/docs/user-guide/kubeconfig-file/) in `generated/kubeconfig` required for [kubectl](http://kubernetes.io/docs/user-guide/kubectl-overview/). Instructions are provided at the end of the installation on how to use it.
