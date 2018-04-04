@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/apprenda/kismatic/pkg/store"
+
 	"github.com/apprenda/kismatic/pkg/ssh"
 	"github.com/apprenda/kismatic/pkg/tls"
 )
@@ -1032,4 +1034,29 @@ func (plan Plan) certSpecs(clusterCA *tls.CA, proxyClientCA *tls.CA) ([]certific
 	})
 
 	return m, nil
+}
+
+func (p Plan) ConvertToSpec(state string) store.Cluster {
+	var spec store.Cluster
+	spec.Spec = store.ClusterSpec{
+		DesiredState: state,
+		EtcdCount:    p.Etcd.ExpectedCount,
+		MasterCount:  p.Master.ExpectedCount,
+		WorkerCount:  p.Worker.ExpectedCount,
+		IngressCount: p.Ingress.ExpectedCount,
+		Provisioner: store.Provisioner{
+			Provider: p.Provisioner.Provider,
+			Options:  p.Provisioner.Options,
+		},
+	}
+	spec.Status = store.ClusterStatus{}
+	spec.Status.CurrentState = state
+	if p.Master.LoadBalancedFQDN != "" {
+		spec.Status.ClusterIP = p.Master.LoadBalancedFQDN
+	} else if p.Master.LoadBalancedShortName != "" {
+		spec.Status.ClusterIP = p.Master.LoadBalancedShortName
+	} else if len(p.Master.Nodes) > 0 {
+		spec.Status.ClusterIP = p.Master.Nodes[0].IP
+	}
+	return spec
 }

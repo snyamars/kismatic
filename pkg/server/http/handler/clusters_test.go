@@ -24,6 +24,10 @@ type mockClustersStore struct {
 	store map[string]store.Cluster
 }
 
+func (cs mockClustersStore) Close() {
+	return
+}
+
 func (cs mockClustersStore) Get(key string) (*store.Cluster, error) {
 	c, ok := cs.store[key]
 	if !ok {

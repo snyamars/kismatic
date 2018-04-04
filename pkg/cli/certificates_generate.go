@@ -41,7 +41,10 @@ func NewCmdGenerate(out io.Writer) *cobra.Command {
 			}
 			clusterName := args[0]
 			certName := args[1]
-			if exists, err := CheckClusterExists(clusterName); !exists {
+			path := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(path)
+			defer s.Close()
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
 				return err
 			}
 			_, generatedPath, _ := generateDirsFromName(clusterName)

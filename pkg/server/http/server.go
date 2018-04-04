@@ -206,6 +206,8 @@ func (s *HttpServer) Init() error {
 	//     description: OK
 	//   '404':
 	//     description: cluster with {name} not found
+	//   '412':
+	//     description: cluster with state unmanaged cannot be modified via the api
 	//   '500':
 	//     description: marshalling/fetching error
 	router.DELETE(APIPath+"/clusters/:name", s.ClustersAPI.Delete)
@@ -286,6 +288,8 @@ func (s *HttpServer) Init() error {
 	//     description: ok
 	//   '404':
 	//     description: cluster with {name} not found
+	//   '412':
+	//     description: cluster with state unmanaged cannot be modified via the api
 	//   '500':
 	//     description: couldn't find kubeconfig
 	router.GET(APIPath+"/clusters/:name/kubeconfig", s.ClustersAPI.GetKubeconfig)

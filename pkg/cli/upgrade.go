@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/apprenda/kismatic/pkg/data"
@@ -83,7 +84,10 @@ production workloads.
 				return cmd.Usage()
 			}
 			clusterName := args[0]
-			if exists, err := CheckClusterExists(clusterName); !exists {
+			dbPath := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(dbPath)
+			defer s.Close()
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
 				return err
 			}
 			planPath, generatedPath, _ := generateDirsFromName(clusterName)
@@ -115,7 +119,10 @@ before any changes are applied.
 				return cmd.Usage()
 			}
 			clusterName := args[0]
-			if exists, err := CheckClusterExists(clusterName); !exists {
+			dbPath := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(dbPath)
+			defer s.Close()
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
 				return err
 			}
 			planPath, generatedPath, _ := generateDirsFromName(clusterName)

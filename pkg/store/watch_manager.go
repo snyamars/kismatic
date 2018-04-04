@@ -61,7 +61,6 @@ func (mgr *watchMgr) run(ctx context.Context) {
 			case writeOnKeyMsg:
 				watchers, ok := mgr.watchersPerKey[m.bucket]
 				if !ok {
-					mgr.logger.Printf("cannot send key write notification, bucket %q is nil\n", m.bucket)
 					continue
 				}
 				for _, w := range watchers {

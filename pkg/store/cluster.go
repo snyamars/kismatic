@@ -5,6 +5,24 @@ import (
 	"encoding/json"
 )
 
+const (
+	Unmanaged       = "unmanaged"
+	Planning        = "planning"
+	PlanningFailed  = "planningFailed"
+	Planned         = "planned"
+	Provisioning    = "provisioning"
+	ProvisionFailed = "provisionFailed"
+	Provisioned     = "provisioned"
+	Installing      = "installing"
+	InstallFailed   = "installFailed"
+	Installed       = "installed"
+	Modifying       = "modifying"
+	ModifyFailed    = "modifyFailed"
+	Destroying      = "destroying"
+	DestroyFailed   = "destroyFailed"
+	Destroyed       = "destroyed"
+)
+
 // Cluster defines a Kubernetes cluster in KET
 type Cluster struct {
 	Spec   ClusterSpec
@@ -55,6 +73,7 @@ type Provisioner struct {
 // so that the clients don't need to worry about the bucket
 // or marshaling/unmarshaling
 type ClusterStore interface {
+	Close()
 	Get(key string) (*Cluster, error)
 	Put(key string, cluster Cluster) error
 	GetAll() (map[string]Cluster, error)
@@ -71,6 +90,10 @@ type cs struct {
 // bucket.
 func NewClusterStore(store WatchedStore, bucket string) ClusterStore {
 	return cs{Store: store, Bucket: bucket}
+}
+
+func (s cs) Close() {
+	s.Store.Close()
 }
 
 func (s cs) Get(key string) (*Cluster, error) {

@@ -3,11 +3,15 @@ package cli
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/apprenda/kismatic/pkg/store"
 )
 
 const (
+	defaultDBName        = "clusterStates.db"
 	defaultPlanName      = "kismatic-cluster.yaml"
 	defaultClusterName   = "kubernetes"
 	assetsFolder         = "clusters"
@@ -34,12 +38,16 @@ func generateDirsFromName(clusterName string) (string, string, string) {
 
 // CheckClusterExists does a simple check to see if the cluster folder+plan file exists in clusters
 // returns true even in the cases where an error exists if the scan hasn't completed.
-func CheckClusterExists(name string) (bool, error) {
+func CheckClusterExists(name string, s store.ClusterStore) (bool, error) {
 	if err := os.MkdirAll(assetsFolder, 0700); err != nil {
 		return true, err
 	}
-	// TODO: also check db
-	// MOVED TO "seamless" PR - requires store interface changes
+	if spec, err := s.Get(name); spec != nil {
+		if err != nil {
+			return true, err
+		}
+		return true, nil
+	}
 	files, err := ioutil.ReadDir(assetsFolder)
 	if err != nil {
 		return true, err
@@ -57,5 +65,27 @@ func CheckClusterExists(name string) (bool, error) {
 			}
 		}
 	}
-	return false, fmt.Errorf("Cluster with name %s not found. If you have a plan file, but your cluster doesn't exist, please run kismatic import PLAN_FILE_PATH.", name)
+	return false, fmt.Errorf("cluster with name %s not found. If you have a plan file, but your cluster doesn't exist, please run kismatic import PLAN_FILE_PATH GENERATED_ASSETS_DIR", name)
+}
+
+// CreateStoreIfNotExists creates a database file at location path. returns ClusterStore that will interact with that file, and a logger for the store.
+func CreateStoreIfNotExists(path string) (store.ClusterStore, *log.Logger) {
+	parent, _ := filepath.Split(path)
+	logger := log.New(os.Stdout, "[kismatic] ", log.LstdFlags|log.Lshortfile)
+	if err := os.MkdirAll(parent, 0700); err != nil {
+		logger.Fatalf("Error creating store directory structure: %v", err)
+	}
+	// Create the store
+	s, err := store.New(path, 0600, logger)
+	if err != nil {
+		logger.Fatalf("Error creating store: %v", err)
+	}
+
+	err = s.CreateBucket(clustersBucket)
+	if err != nil {
+		logger.Fatalf("Error creating bucket in store: %v", err)
+	}
+
+	clusterStore := store.NewClusterStore(s, clustersBucket)
+	return clusterStore, logger
 }

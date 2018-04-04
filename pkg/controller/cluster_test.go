@@ -146,7 +146,7 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 	defer func() { close(writerDone) }()
 	go func(done <-chan struct{}) {
 		cluster := store.Cluster{
-			Spec: store.ClusterSpec{DesiredState: installed},
+			Spec: store.ClusterSpec{DesiredState: store.Installed},
 		}
 		err = clusterStore.Put(clusterName, cluster)
 		if err != nil {
@@ -224,7 +224,7 @@ func TestClusterControllerReconciliationLoop(t *testing.T) {
 	// The controller should pick it up in the reconciliation loop.
 	clusterName := "testCluster"
 	cluster := store.Cluster{
-		Spec: store.ClusterSpec{DesiredState: installed},
+		Spec: store.ClusterSpec{DesiredState: store.Installed},
 	}
 	err = clusterStore.Put(clusterName, cluster)
 	if err != nil {

@@ -34,7 +34,10 @@ func NewCmdDashboard(in io.Reader, out io.Writer) *cobra.Command {
 				return cmd.Usage()
 			}
 			clusterName := args[0]
-			if exists, err := CheckClusterExists(clusterName); !exists {
+			path := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(path)
+			defer s.Close()
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
 				return err
 			}
 			opts.planFilename, opts.generatedAssetsDir, _ = generateDirsFromName(clusterName)
