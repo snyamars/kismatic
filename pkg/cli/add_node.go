@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/apprenda/kismatic/pkg/install"
+	"github.com/apprenda/kismatic/pkg/store"
 	"github.com/apprenda/kismatic/pkg/util"
 	"github.com/spf13/cobra"
 )
@@ -35,12 +37,24 @@ func NewCmdAddNode(out io.Writer) *cobra.Command {
 			if len(args) < 3 || len(args) > 4 {
 				return cmd.Usage()
 			}
+			path := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(path)
+			defer s.Close()
 			clusterName := args[0]
-			if exists, err := CheckClusterExists(clusterName); !exists {
-				return err
-			}
 			var planPath string
 			planPath, opts.GeneratedAssetsDirectory, _ = generateDirsFromName(clusterName)
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
+				return err
+			}
+			spec, err := s.Get(clusterName)
+			if err != nil {
+				return err
+			}
+			if spec.Status.CurrentState != store.Unmanaged {
+				return fmt.Errorf(`the add-node workflow is only defined for bare-metal clusters. If you need to add a node to a cluster that Kismatic provisioned,
+					simply change the number of workers defined in the plan at %s, and then re-run the provision and apply commands`, planPath)
+			}
+
 			newNode := install.Node{
 				Host: args[1],
 				IP:   args[2],

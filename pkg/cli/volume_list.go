@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -29,7 +30,10 @@ This function requires a target cluster that has storage nodes.`,
 				return cmd.Usage()
 			}
 			clusterName := args[0]
-			if exists, err := CheckClusterExists(clusterName); !exists {
+			dbPath := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(dbPath)
+			defer s.Close()
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
 				return err
 			}
 			planPath, _, _ := generateDirsFromName(clusterName)
