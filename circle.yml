@@ -9,6 +9,10 @@ jobs:
     <<: *defaults
     steps:
       - checkout
+      - setup_remote_docker
+      - run:
+          name: Docker login
+          command: docker login -u $DOCKER_USER -p $DOCKER_PW
       - run: 
           name: Install unzip
           command: sudo apt update && sudo apt install unzip
@@ -26,13 +30,12 @@ jobs:
           command: diff -u <(cat docs/plan-file-reference.md) <(make docs/generate-plan-file-reference.md)
       - run:
           name: Verify reference API documentation is up to date
-          command: 
-            "diff -u <(cat docs/swagger.json) <(GOROOT=$(go env GOROOT) tools/swagger_$(go env GOOS) generate spec -b ./pkg/server)"
+          command: diff -u <(cat docs/swagger.json) <(GOROOT=$(go env GOROOT) tools/swagger-$(go env GOOS)-$(go env GOARCH) generate spec -b ./pkg/server)
       - run:
           name: Create release directory # Used for releasing to GH
           command: mkdir release
       - run:
-          name: Darwin, Linux dists
+          name: Darwin, Linux, Docker dists
           command: make all-host
       - run:
           name: Darwin tarball

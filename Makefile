@@ -168,6 +168,7 @@ slow-integration-test:
 all:
 	@$(MAKE) GOOS=darwin dist
 	@$(MAKE) GOOS=linux dist
+	@$(MAKE) dist-docker
 
 shallow-clean:
 	rm -rf $(BUILD_OUTPUT)
@@ -277,6 +278,7 @@ tarball:
 all-host:
 	@$(MAKE) GOOS=darwin dist-host
 	@$(MAKE) GOOS=linux dist-host
+	@$(MAKE) dist-docker
 
 test-host:
 	go test ./cmd/... ./pkg/... $(TEST_OPTS)
@@ -357,6 +359,16 @@ dist-common: vendor build-host build-inspector-host copy-all
 
 dist-host: shallow-clean dist-common
 
+dist-docker: 
+	@$(MAKE) GOOS=linux BUILD_OUTPUT=out-docker dist-common
+	docker build . --no-cache --tag apprenda/kismatic:dev-$(BRANCH) 
+	docker push apprenda/kismatic:dev-$(BRANCH)
+
+docker-release:
+	@$(MAKE) GOOS=linux BUILD_OUTPUT=out-docker dist-common
+	docker build . --no-cache --tag apprenda/kismatic
+	docker push apprenda/kismatic
+	
 get-ginkgo:
 	go get github.com/onsi/ginkgo/ginkgo
 	cd integration-tests

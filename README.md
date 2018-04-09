@@ -82,14 +82,31 @@ The installation consists of three phases:
 1. **Plan**: `kismatic install plan`
    1. The installer will ask basic questions about the intent of your cluster.
    2. The installer will produce a `kismatic-cluster.yaml` which you will edit to capture your intent.
-2. **Provision**
-   1. You provision your own machines
-   2. You tweak your network
+2. **Provision**: `kismatic install provision`
+   1. Kismatic provisions your machines using Terraform
+   2. Review the HCL config in `providers` to see the specifics.
    3. Review the installation plan in `kismatic-cluster.yaml` and add information for each node.
 3. **Install**: `kismatic install apply`
    1. The installer checks your provisioned infrastructure against your intent.
    2. If the installation plan is valid, Kismatic will build you a cluster.
    3. After installation, Kismatic performs a basic test of scaling and networking on the cluster
+
+## Using Kismatic with Docker.
+
+### Using the CLI
+
+The basic installation instructions still apply. The entrypoint to the container is the binary itself. Please note that the container itself does not have persistent storage, so you need a volume mount to preserve your plan file, ssh keys, terraform state, etc.
+`docker run -itv $(pwd):/root/kismatic/clusters apprenda/kismatic`
+If you're looking to provide your own terraform config, you need to add a volume for that as well.
+I.E.:
+`docker run -itv $(pwd):/root/kismatic/clusters -v path_to_dir_with_HCL:/root/kismatic/providers/your_provider_name_here apprenda/kismatic`
+Please note that the path needs to be the parent directory (that is, the result of if you `pwd` in the location of the scripts).
+
+### Using KET-server 
+
+KET 2.0 now ships with a different operating mode, allowing you to use Kismatic as an HTTP server.
+`docker run -itv $(pwd):/root/kismatic/ -p HOST_PORT:8080 apprenda/kismatic server --insecure-disable-tls`
+If you want to run KET with TLS, `docker run -itv $(pwd):/root/kismatic/ -p HOST_PORT:8443 apprenda/kismatic server --cert-file PATH_TO_CERT --key-file PATH_TO_KEY`. Please note, you may have to change the volume mapping if the cert and key are not in the working directory. 
 
 ### Using your cluster
 
