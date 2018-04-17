@@ -62,13 +62,19 @@ func (i image) String() string {
 func NewCmdSeedRegistry(stdout, stderr io.Writer) *cobra.Command {
 	var options seedRegistryOptions
 	cmd := &cobra.Command{
-		Use:   "seed-registry",
+		Use:   "seed-registry CLUSTER_NAME",
 		Short: "seed a registry with the container images required by KET",
 		Long:  seedRegistryLong,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 0 {
+			if len(args) != 1 {
 				return cmd.Usage()
 			}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			planPath, _, _ := generateDirsFromName(clusterName)
+			options.planFile = planPath
 			if options.listOnly {
 				return doListImages(stdout, options)
 			}
@@ -79,7 +85,6 @@ func NewCmdSeedRegistry(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.verbose, "verbose", false, "enable verbose logging")
 	cmd.Flags().StringVar(&options.registryServer, "server", "", "set to the location of the registry server, without the protocol (e.g. localhost:5000)")
 	cmd.Flags().StringVar(&options.imagesManifestsFile, "images-manifest-file", "", "path to the container images manifest file")
-	addPlanFileFlag(cmd.Flags(), &options.planFile)
 	return cmd
 }
 

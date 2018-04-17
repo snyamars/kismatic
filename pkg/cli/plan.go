@@ -20,7 +20,7 @@ func NewCmdPlan(in io.Reader, out io.Writer, options *installOpts) *cobra.Comman
 			if len(args) != 0 {
 				return fmt.Errorf("Unexpected args: %v", args)
 			}
-			planner := install.FilePlanner{File: options.planFilename}
+			planner := install.FilePlanner{}
 			return doPlan(in, out, planner)
 		},
 	}
@@ -31,12 +31,19 @@ func NewCmdPlan(in io.Reader, out io.Writer, options *installOpts) *cobra.Comman
 func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
 	providersDir := "./providers"
 	fmt.Fprintln(out, "Plan your Kubernetes cluster:")
-
-	name, err := util.PromptForAnyString(in, out, "Cluster name (must be unique)", "kismatic-cluster")
+	name, err := util.PromptForAnyString(in, out, "Cluster name (must be unique)", defaultClusterName)
 	if err != nil {
 		return fmt.Errorf("Error setting infrastructure provisioner: %v", err)
 	}
+	exists, err := CheckClusterExists(name)
+	if exists {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("cannot plan cluster with name %s, please use another name", name)
+	}
 
+	planner.File, _, _ = generateDirsFromName(name)
 	var provider string
 	availProviders, err := availableInfraProviders(providersDir)
 	if err != nil {

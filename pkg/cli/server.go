@@ -24,11 +24,9 @@ import (
 )
 
 const (
-	defaultTimeout      = 10 * time.Second
-	clustersBucket      = "kismatic"
-	assetsFolder        = "assets"
 	defaultInsecurePort = "8080"
 	defaultSecurePort   = "8443"
+	defaultTimeout      = 10 * time.Second
 )
 
 type serverOptions struct {
@@ -52,6 +50,7 @@ A local datastore will be created to persist the state of the clusters managed b
 
 If cert-file or key-file are not provided, a self-signed CA will be used to create the required key-pair for TLS. 
 		`,
+
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				return cmd.Usage()
@@ -62,14 +61,17 @@ If cert-file or key-file are not provided, a self-signed CA will be used to crea
 	cmd.Flags().StringVarP(&options.port, "port", "p", "", "port to start the server on. Defaults to 8443, or 8080 when TLS is disabled.")
 	cmd.Flags().StringVar(&options.certFile, "cert-file", "", "path to the TLS cert file")
 	cmd.Flags().StringVar(&options.keyFile, "key-file", "", "path to the TLS key file")
-	cmd.Flags().StringVar(&options.dbFile, "db-file", "./server.db", "path to the database file")
+	cmd.Flags().StringVar(&options.dbFile, "db-file", filepath.Join(assetsFolder, "server.db"), "path to the database file")
 	cmd.Flags().BoolVar(&options.disableTLS, "insecure-disable-tls", false, "set to true to disable TLS")
 	return cmd
 }
 
 func doServer(stdout io.Writer, options serverOptions) error {
 	logger := log.New(stdout, "[kismatic] ", log.LstdFlags|log.Lshortfile)
-
+	parent, _ := filepath.Split(options.dbFile)
+	if err := os.MkdirAll(parent, 0700); err != nil {
+		logger.Fatalf("Error creating store directory structure: %v", err)
+	}
 	// Create the store
 	s, err := store.New(options.dbFile, 0600, logger)
 	if err != nil {

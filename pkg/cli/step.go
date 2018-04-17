@@ -27,33 +27,37 @@ type stepCmd struct {
 // NewCmdStep returns the step command
 func NewCmdStep(out io.Writer, opts *installOpts) *cobra.Command {
 	stepCmd := &stepCmd{
-		out:      out,
-		planFile: opts.planFilename,
+		out: out,
 	}
 	cmd := &cobra.Command{
-		Use:   "step PLAY_NAME",
+		Use:   "step CLUSTER_NAME PLAY_NAME",
 		Short: "run a specific task of the installation workflow (debug feature)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 1 {
+			if len(args) != 2 {
 				return cmd.Usage()
 			}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			planPath, generatedPath, runsPath := generateDirsFromName(clusterName)
 			execOpts := install.ExecutorOptions{
-				GeneratedAssetsDirectory: stepCmd.generatedAssetsDir,
+				GeneratedAssetsDirectory: generatedPath,
 				OutputFormat:             stepCmd.outputFormat,
 				Verbose:                  stepCmd.verbose,
+				RunsDirectory:            runsPath,
 			}
 			executor, err := install.NewExecutor(out, os.Stderr, execOpts)
 			if err != nil {
 				return err
 			}
-			stepCmd.task = args[0]
-			stepCmd.planFile = opts.planFilename
-			stepCmd.planner = &install.FilePlanner{File: stepCmd.planFile}
+			stepCmd.task = fmt.Sprintf("_%s.yaml", args[1])
+			stepCmd.planFile = planPath
+			stepCmd.planner = &install.FilePlanner{File: planPath}
 			stepCmd.executor = executor
 			return stepCmd.run()
 		},
 	}
-	cmd.Flags().StringVar(&stepCmd.generatedAssetsDir, "generated-assets-dir", "generated", "path to the directory where assets generated during the installation process will be stored")
 	cmd.Flags().BoolVar(&stepCmd.restartServices, "restart-services", false, "force restart cluster services (Use with care)")
 	cmd.Flags().BoolVar(&stepCmd.verbose, "verbose", false, "enable verbose logging from the installation")
 	cmd.Flags().StringVarP(&stepCmd.outputFormat, "output", "o", "simple", "installation output format (options \"simple\"|\"raw\")")

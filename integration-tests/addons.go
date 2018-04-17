@@ -11,7 +11,7 @@ import (
 
 func verifyHeapster(master NodeDeets, sshKey string) error {
 	// create volumes for alertmanager, prometheus-server and grafana
-	cmd := exec.Command("./kismatic", "volume", "add", "1", "-f", "kismatic-testing.yaml")
+	cmd := exec.Command("./kismatic", "volume", "add", defaultClusterName, "1")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

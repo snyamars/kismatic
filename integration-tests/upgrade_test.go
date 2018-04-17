@@ -162,7 +162,7 @@ var _ = Describe("Upgrade", func() {
 
 								// Cleanup old cluster file and create a new one
 								By("Recreating kismatic-testing.yaml file")
-								err = os.Remove("kismatic-testing.yaml")
+								err = os.Remove(clusterPath)
 								FailIfError(err)
 								opts = installOptions{
 									disconnectedInstallation: true,
@@ -229,7 +229,7 @@ var _ = Describe("Upgrade", func() {
 
 								// Cleanup old cluster file and create a new one
 								By("Recreating kismatic-testing.yaml file")
-								err = os.Remove("kismatic-testing.yaml")
+								err = os.Remove(clusterPath)
 								FailIfError(err)
 								opts = installOptions{
 									disconnectedInstallation: true,
@@ -268,16 +268,16 @@ func extractCurrentKismaticInstaller() {
 }
 func upgradeCluster(online bool) {
 	// Perform upgrade
-	cmd := exec.Command("./kismatic", "upgrade", "offline", "-f", "kismatic-testing.yaml")
+	cmd := exec.Command("./kismatic", "upgrade", "offline", defaultClusterName)
 	if online {
-		cmd = exec.Command("./kismatic", "upgrade", "online", "-f", "kismatic-testing.yaml", "--ignore-safety-checks")
+		cmd = exec.Command("./kismatic", "upgrade", "online", defaultClusterName, "--ignore-safety-checks")
 	}
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
 		fmt.Println("Running diagnostics command")
 		// run diagnostics on error
-		diagsCmd := exec.Command("./kismatic", "diagnose", "-f", "kismatic-testing.yaml")
+		diagsCmd := exec.Command("./kismatic", "diagnose", defaultClusterName)
 		diagsCmd.Stdout = os.Stdout
 		diagsCmd.Stderr = os.Stderr
 		if errDiags := diagsCmd.Run(); errDiags != nil {

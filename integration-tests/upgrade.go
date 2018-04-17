@@ -32,8 +32,7 @@ func assertClusterVersionIsCurrent() {
 }
 
 func assertClusterVersion(version string) {
-	By("Calling ./kismatic info to get the cluster's version")
-	cmd := exec.Command("./kismatic", "info", "-f", "kismatic-testing.yaml", "-o", "json")
+	cmd := exec.Command("./kismatic", "info", defaultClusterName, "-o", "json")
 	out, err := cmd.Output()
 	FailIfError(err)
 	info := infoOutput{}

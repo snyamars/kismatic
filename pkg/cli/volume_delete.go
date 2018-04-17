@@ -19,15 +19,25 @@ type volumeDeleteOptions struct {
 }
 
 // NewCmdVolumeDelete returns the command for deleting storage volumes
-func NewCmdVolumeDelete(in io.Reader, out io.Writer, planFile *string) *cobra.Command {
+func NewCmdVolumeDelete(in io.Reader, out io.Writer) *cobra.Command {
 	opts := volumeDeleteOptions{}
 	cmd := &cobra.Command{
-		Use:   "delete volume-name",
+		Use:   "delete CLUSTER_NAME VOLUME_NAME",
 		Short: "delete storage volumes",
 		Long: `Delete storage volumes created by the 'volume add' command.
 		
 WARNING all data in the volume will be lost.`,
+
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 2 {
+				return cmd.Usage()
+			}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			planPath, generatedPath, _ := generateDirsFromName(clusterName)
+			opts.generatedAssetsDir = generatedPath
 			if opts.force == false {
 				ans, err := util.PromptForString(in, out, "Are you sure you want to delete this volume? All data will be lost", "N", []string{"N", "y"})
 				if err != nil {
@@ -37,12 +47,11 @@ WARNING all data in the volume will be lost.`,
 					os.Exit(0)
 				}
 			}
-			return doVolumeDelete(out, opts, *planFile, args)
+			return doVolumeDelete(out, opts, planPath, args)
 		},
 	}
 	cmd.Flags().BoolVar(&opts.verbose, "verbose", false, "enable verbose logging")
 	cmd.Flags().StringVarP(&opts.outputFormat, "output", "o", "simple", `output format (options simple|raw)`)
-	cmd.Flags().StringVar(&opts.generatedAssetsDir, "generated-assets-dir", "generated", "path to the directory where assets generated during the installation process will be stored")
 	cmd.Flags().BoolVar(&opts.force, "force", false, `do not prompt`)
 	return cmd
 }

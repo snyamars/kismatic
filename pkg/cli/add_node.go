@@ -28,19 +28,25 @@ var validRoles = []string{"worker", "ingress", "storage"}
 func NewCmdAddNode(out io.Writer, installOpts *installOpts) *cobra.Command {
 	opts := &addNodeOpts{}
 	cmd := &cobra.Command{
-		Use:     "add-node NODE_NAME NODE_IP [NODE_INTERNAL_IP]",
+		Use:     "add-node CLUSTER_NAME NODE_NAME NODE_IP [NODE_INTERNAL_IP]",
 		Short:   "add a new node to an existing Kubernetes cluster",
 		Aliases: []string{"add-worker"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 2 || len(args) > 3 {
+			if len(args) < 3 || len(args) > 4 {
 				return cmd.Usage()
 			}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			var planPath string
+			planPath, opts.GeneratedAssetsDirectory, _ = generateDirsFromName(clusterName)
 			newNode := install.Node{
-				Host: args[0],
-				IP:   args[1],
+				Host: args[1],
+				IP:   args[2],
 			}
 			if len(args) == 3 {
-				newNode.InternalIP = args[2]
+				newNode.InternalIP = args[3]
 			}
 			// default to 'worker'
 			if len(opts.Roles) == 0 {
@@ -61,12 +67,11 @@ func NewCmdAddNode(out io.Writer, installOpts *installOpts) *cobra.Command {
 					newNode.Labels[pair[0]] = pair[1]
 				}
 			}
-			return doAddNode(out, installOpts.planFilename, opts, newNode)
+			return doAddNode(out, planPath, opts, newNode)
 		},
 	}
 	cmd.Flags().StringSliceVar(&opts.Roles, "roles", []string{}, "roles separated by ',' (options \"worker\"|\"ingress\"|\"storage\")")
 	cmd.Flags().StringSliceVarP(&opts.NodeLabels, "labels", "l", []string{}, "key=value pairs separated by ','")
-	cmd.Flags().StringVar(&opts.GeneratedAssetsDirectory, "generated-assets-dir", "generated", "path to the directory where assets generated during the installation process will be stored")
 	cmd.Flags().BoolVar(&opts.RestartServices, "restart-services", false, "force restart clusters services (Use with care)")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "enable verbose logging from the installation")
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "simple", "installation output format (options \"simple\"|\"raw\")")

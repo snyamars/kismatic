@@ -38,7 +38,7 @@ var _ = Describe("kismatic", func() {
 				Expect(helperr).To(BeNil())
 				helpText := string(helpbytes)
 				Expect(helpText).To(ContainSubstring("Generating installation plan file template"))
-				Expect(helpText).To(ContainSubstring("kismatic-cluster cluster name"))
+				Expect(helpText).To(ContainSubstring("kubernetes cluster name"))
 				Expect(helpText).To(ContainSubstring("infrastructure provider"))
 				Expect(helpText).To(ContainSubstring("3 etcd nodes"))
 				Expect(helpText).To(ContainSubstring("2 master nodes"))
@@ -46,11 +46,11 @@ var _ = Describe("kismatic", func() {
 				Expect(helpText).To(ContainSubstring("2 ingress nodes"))
 				Expect(helpText).To(ContainSubstring("0 storage nodes"))
 				Expect(helpText).To(ContainSubstring("0 nfs volumes"))
-
-				Expect(FileExists("kismatic-cluster.yaml")).To(Equal(true))
+				file := clusterPath
+				Expect(FileExists(file)).To(Equal(true))
 
 				By("Reading generated plan file")
-				yamlBytes, err := ioutil.ReadFile("kismatic-cluster.yaml")
+				yamlBytes, err := ioutil.ReadFile(file)
 				if err != nil {
 					Fail("Could not read cluster file")
 				}
@@ -148,7 +148,7 @@ var _ = Describe("kismatic", func() {
 					err := installKismaticMini(node, sshKey)
 					Expect(err).ToNot(HaveOccurred())
 					// Ensure preflight checks are idempotent on CentOS7
-					err = runValidate("kismatic-testing.yaml")
+					err = runValidate(clusterPath)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})
@@ -160,7 +160,7 @@ var _ = Describe("kismatic", func() {
 					err := installKismaticMini(node, sshKey)
 					Expect(err).ToNot(HaveOccurred())
 					// Ensure preflight checks are idempotent on RedHat7
-					err = runValidate("kismatic-testing.yaml")
+					err = runValidate(clusterPath)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})
@@ -172,7 +172,7 @@ var _ = Describe("kismatic", func() {
 					err := installKismaticMini(node, sshKey)
 					Expect(err).ToNot(HaveOccurred())
 					// Ensure preflight checks are idempotent on Ubuntu 1604
-					err = runValidate("kismatic-testing.yaml")
+					err = runValidate(clusterPath)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})
@@ -328,7 +328,7 @@ var _ = Describe("kismatic", func() {
 						})
 
 						sub.It("should allow for running preflight checks idempotently", func() error {
-							return runValidate("kismatic-testing.yaml")
+							return runValidate(clusterPath)
 						})
 					})
 				})
@@ -396,7 +396,7 @@ var _ = Describe("kismatic", func() {
 						})
 
 						sub.It("should allow for running preflight checks idempotently", func() error {
-							return runValidate("kismatic-testing.yaml")
+							return runValidate(clusterPath)
 						})
 					})
 				})

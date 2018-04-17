@@ -25,21 +25,31 @@ type volumeAddOptions struct {
 }
 
 // NewCmdVolumeAdd returns the command for adding storage volumes
-func NewCmdVolumeAdd(out io.Writer, planFile *string) *cobra.Command {
+func NewCmdVolumeAdd(out io.Writer) *cobra.Command {
 	opts := volumeAddOptions{}
 	cmd := &cobra.Command{
-		Use:   "add size_in_gigabytes [volume-name]",
+		Use:   "add CLUSTER_NAME SIZE_IN_GB [VOLUME_NAME]",
 		Short: "add storage volumes to the Kubernetes cluster",
 		Long: `Add storage volumes to the Kubernetes cluster.
 
 This function requires a target cluster that has storage nodes.`,
+
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return doVolumeAdd(out, opts, *planFile, args)
+			if len(args) < 2 {
+				return cmd.Usage()
+			}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			planPath, generatedPath, _ := generateDirsFromName(clusterName)
+			opts.generatedAssetsDir = generatedPath
+			return doVolumeAdd(out, opts, planPath, args[1:])
 		},
 		Example: `  # Create a 10GB distributed and replicated volume named "storage01"
   # with StorageClass "durable". Grant access to the volume to any client with an IP
   # that starts with 10.10.
-  kismatic volume add 10 storage01 -r 2 -d 2 -c="durable" -a 10.10.*.*
+  kismatic volume add kubernetes 10 storage01 -r 2 -d 2 -c="durable" -a 10.10.*.*
 		`,
 	}
 	cmd.Flags().IntVarP(&opts.replicaCount, "replica-count", "r", 2, "The number of times each file will be written.")
@@ -48,7 +58,6 @@ This function requires a target cluster that has storage nodes.`,
 	cmd.Flags().StringSliceVarP(&opts.allowAddress, "allow-address", "a", nil, "Comma delimited list of address wildcards permitted access to the volume in addition to Kubernetes nodes.")
 	cmd.Flags().BoolVar(&opts.verbose, "verbose", false, "enable verbose logging")
 	cmd.Flags().StringVarP(&opts.outputFormat, "output", "o", "simple", `output format (options simple|raw)`)
-	cmd.Flags().StringVar(&opts.generatedAssetsDir, "generated-assets-dir", "generated", "path to the directory where assets generated during the installation process will be stored")
 	cmd.Flags().StringVar(&opts.reclaimPolicy, "reclaim-policy", "Retain", "Persistent volume reclaim policy (options Retain|Recycle|Delete)")
 	cmd.Flags().StringVar(&opts.accessModes, "access-modes", "ReadWriteMany", "Comma-separated list of access modes for the persistent volume (options ReadWriteOnce|ReadOnlyMany|ReadWriteMany)")
 	return cmd
@@ -60,7 +69,7 @@ func doVolumeAdd(out io.Writer, opts volumeAddOptions, planFile string, args []s
 	var volumeSizeStrGB string
 	switch len(args) {
 	case 0:
-		return errors.New("the volume size (in gigabytes) must be provided as the first argument to add")
+		return errors.New("the volume size (in gigabytes) must be provided as the second argument to add")
 	case 1:
 		volumeSizeStrGB = args[0]
 		volumeName = "kismatic-" + generateRandomString(5)
@@ -68,7 +77,7 @@ func doVolumeAdd(out io.Writer, opts volumeAddOptions, planFile string, args []s
 		volumeSizeStrGB = args[0]
 		volumeName = args[1]
 	default:
-		return fmt.Errorf("%d arguments were provided, but add does not support more than two arguments", len(args))
+		return fmt.Errorf("%d arguments were provided, but add does not support more than three arguments", len(args))
 	}
 	volumeSizeGB, err := strconv.Atoi(volumeSizeStrGB)
 	if err != nil {

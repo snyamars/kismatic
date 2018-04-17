@@ -67,7 +67,7 @@ install:
 	    make bin/$(GOOS)/kismatic build-inspector-host copy-kismatic copy-playbooks copy-inspector
 
 dist: shallow-clean
-	@echo "Running dist inside contianer"
+	@echo "Running dist inside container"
 	@docker run                                \
 	    --rm                                   \
 	    -e GOOS="$(GOOS)"                      \
@@ -100,7 +100,7 @@ test:
 
 integration-test: 
 	mkdir -p tmp
-	@echo "Running integration tests inside contianer"
+	@echo "Running integration tests inside container"
 	@docker run                                                 \
 	    --rm                                                    \
 	    -e GOOS="linux"                                         \
@@ -121,7 +121,7 @@ integration-test:
 
 focus-integration-test: 
 	mkdir -p tmp
-	@echo "Running integration tests inside contianer"
+	@echo "Running integration tests inside container"
 	@docker run                                                 \
 	    --rm                                                    \
 	    -e FOCUS="$(FOCUS)"                                     \
@@ -143,7 +143,7 @@ focus-integration-test:
 
 slow-integration-test: 
 	mkdir -p tmp
-	@echo "Running integration tests inside contianer"
+	@echo "Running integration tests inside container"
 	@docker run                                                 \
 	    --rm                                                    \
 	    -e GOOS="linux"                                         \
@@ -384,6 +384,11 @@ slow-integration-test-host: get-ginkgo
 focus-integration-test-host: get-ginkgo
 	@$(MAKE) GOOS=linux tarball
 	ginkgo --focus $(FOCUS) $(GINKGO_OPTS) -v integration-tests
+
+docs/generate-kismatic-cli:
+	mkdir -p docs/kismatic-cli
+	go run cmd/kismatic-docs/main.go
+	cp docs/kismatic-cli/kismatic.md docs/kismatic-cli/README.md
 
 docs/update-plan-file-reference.md:
 	@$(MAKE) docs/generate-plan-file-reference.md > docs/plan-file-reference.md

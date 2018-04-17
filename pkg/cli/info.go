@@ -21,16 +21,23 @@ type infoOpts struct {
 func NewCmdInfo(out io.Writer) *cobra.Command {
 	opts := &infoOpts{}
 	cmd := &cobra.Command{
-		Use:   "info",
+		Use:   "info CLUSTER_NAME",
 		Short: "Display info about nodes in the cluster",
 		Long: `will list the nodes that make up the cluster, along with their current versions & roles.
 
 This will be retrieved by connecting to each node via ssh`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				return cmd.Usage()
+			}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			opts.planFilename, _, _ = generateDirsFromName(clusterName)
 			return list(out, opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.planFilename, "plan-file", "f", "kismatic-cluster.yaml", "path to the installation plan file")
 	cmd.Flags().StringVarP(&opts.outputFormat, "output", "o", "simple", `output format (options "simple"|"json")`)
 	return cmd
 }

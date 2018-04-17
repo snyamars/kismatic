@@ -2,11 +2,40 @@ package integration_tests
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
+	"github.com/apprenda/kismatic/pkg/install"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+const (
+	defaultPlanName    = "kismatic-cluster.yaml"
+	defaultClusterName = "kubernetes"
+	assetsFolder       = "clusters"
+)
+
+var clusterPath = filepath.Join(assetsFolder, defaultClusterName, defaultPlanName)
+
+// runImport runs a `kismatic import TARGET`
+func runImport(planFileName string) (string, error) {
+	fp := install.FilePlanner{File: planFileName}
+	plan, err := fp.Read()
+	if err != nil {
+		return "", fmt.Errorf("error reading plan: %v", err)
+	}
+	name := plan.Cluster.Name
+	importCmd := exec.Command("./kismatic", "import", planFileName)
+	importCmd.Stdout = os.Stdout
+	importCmd.Stderr = os.Stderr
+	if err := importCmd.Run(); err != nil {
+		return "", fmt.Errorf("error importing plan: %v", err)
+	}
+	return name, nil
+}
 
 // ItOnAWS runs a spec if the AWS details have been provided
 func ItOnAWS(description string, f func(infrastructureProvisioner)) {

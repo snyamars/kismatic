@@ -21,19 +21,21 @@ func NewCmdDiagnostic(out io.Writer) *cobra.Command {
 	opts := &diagsOpts{}
 
 	cmd := &cobra.Command{
-		Use:   "diagnose",
+		Use:   "diagnose CLUSTER_NAME",
 		Short: "Collects diagnostics about the nodes in the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("Unexpected args: %v", args)
+			if len(args) != 1 {
+				return cmd.Usage()
 			}
-
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			opts.planFilename, _, _ = generateDirsFromName(clusterName)
 			return doDiagnostics(out, opts)
 		},
 	}
 
-	// PersistentFlags
-	addPlanFileFlag(cmd.PersistentFlags(), &opts.planFilename)
 	cmd.Flags().BoolVar(&opts.verbose, "verbose", false, "enable verbose logging from the installation")
 	cmd.Flags().StringVarP(&opts.outputFormat, "output", "o", "simple", "installation output format (options \"simple\"|\"raw\")")
 

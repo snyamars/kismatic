@@ -34,15 +34,20 @@ type applyOpts struct {
 func NewCmdApply(out io.Writer, installOpts *installOpts) *cobra.Command {
 	applyOpts := applyOpts{}
 	cmd := &cobra.Command{
-		Use:   "apply",
+		Use:   "apply CLUSTER_NAME",
 		Short: "apply your plan file to create a Kubernetes cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("Unexpected args: %v", args)
+			if len(args) != 1 {
+				return cmd.Usage()
 			}
-			planner := &install.FilePlanner{File: installOpts.planFilename}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			planPath, generatedPath, _ := generateDirsFromName(clusterName)
+			planner := &install.FilePlanner{File: planPath}
 			executorOpts := install.ExecutorOptions{
-				GeneratedAssetsDirectory: applyOpts.generatedAssetsDir,
+				GeneratedAssetsDirectory: generatedPath,
 				OutputFormat:             applyOpts.outputFormat,
 				Verbose:                  applyOpts.verbose,
 			}
@@ -55,8 +60,8 @@ func NewCmdApply(out io.Writer, installOpts *installOpts) *cobra.Command {
 				out:                out,
 				planner:            planner,
 				executor:           executor,
-				planFile:           installOpts.planFilename,
-				generatedAssetsDir: applyOpts.generatedAssetsDir,
+				planFile:           planPath,
+				generatedAssetsDir: generatedPath,
 				verbose:            applyOpts.verbose,
 				outputFormat:       applyOpts.outputFormat,
 				skipPreFlight:      applyOpts.skipPreFlight,
@@ -67,7 +72,6 @@ func NewCmdApply(out io.Writer, installOpts *installOpts) *cobra.Command {
 	}
 
 	// Flags
-	cmd.Flags().StringVar(&applyOpts.generatedAssetsDir, "generated-assets-dir", "generated", "path to the directory where assets generated during the installation process will be stored")
 	cmd.Flags().BoolVar(&applyOpts.restartServices, "restart-services", false, "force restart cluster services (Use with care)")
 	cmd.Flags().BoolVar(&applyOpts.verbose, "verbose", false, "enable verbose logging from the installation")
 	cmd.Flags().StringVarP(&applyOpts.outputFormat, "output", "o", "simple", "installation output format (options \"simple\"|\"raw\")")
@@ -122,13 +126,18 @@ func (c *applyCmd) run() error {
 
 	util.PrintColor(c.out, util.Green, "\nThe cluster was installed successfully!\n")
 	fmt.Fprintln(c.out)
-
+	fp := c.planner
+	planFromFile, err := fp.Read()
+	if err != nil {
+		return err
+	}
+	clusterName := planFromFile.Cluster.Name
 	msg := "- To use the generated kubeconfig file with kubectl:" +
 		"\n    * use \"./kubectl --kubeconfig %s/kubeconfig\"" +
 		"\n    * or copy the config file \"cp %[1]s/kubeconfig ~/.kube/config\"\n"
 	util.PrintColor(c.out, util.Blue, msg, c.generatedAssetsDir)
-	util.PrintColor(c.out, util.Blue, "- To view the Kubernetes dashboard: \"./kismatic dashboard\"\n")
-	util.PrintColor(c.out, util.Blue, "- To SSH into a cluster node: \"./kismatic ssh etcd|master|worker|storage|$node.host\"\n")
+	util.PrintColor(c.out, util.Blue, "- To view the Kubernetes dashboard: \"./kismatic dashboard "+clusterName+"\n")
+	util.PrintColor(c.out, util.Blue, "- To SSH into a cluster node: \"./kismatic ssh "+clusterName+" etcd|master|worker|storage|$node.host\"\n")
 	fmt.Fprintln(c.out)
 
 	return nil

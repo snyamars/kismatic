@@ -8,7 +8,6 @@ import (
 
 // NewCmdVolume returns the storage command
 func NewCmdVolume(in io.Reader, out io.Writer) *cobra.Command {
-	var planFile string
 	cmd := &cobra.Command{
 		Use:   "volume",
 		Short: "manage storage volumes on your Kubernetes cluster",
@@ -16,9 +15,8 @@ func NewCmdVolume(in io.Reader, out io.Writer) *cobra.Command {
 			return cmd.Usage()
 		},
 	}
-	addPlanFileFlag(cmd.PersistentFlags(), &planFile)
-	cmd.AddCommand(NewCmdVolumeAdd(out, &planFile))
-	cmd.AddCommand(NewCmdVolumeList(out, &planFile))
-	cmd.AddCommand(NewCmdVolumeDelete(in, out, &planFile))
+	cmd.AddCommand(NewCmdVolumeAdd(out))
+	cmd.AddCommand(NewCmdVolumeList(out))
+	cmd.AddCommand(NewCmdVolumeDelete(in, out))
 	return cmd
 }

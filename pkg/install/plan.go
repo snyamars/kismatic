@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -253,7 +254,10 @@ func (fp *FilePlanner) Write(p *Plan) error {
 	if marshalErr != nil {
 		return fmt.Errorf("error marshalling plan to yaml: %v", marshalErr)
 	}
-
+	dir, _ := filepath.Split(fp.File)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("error making plan file parent directories: %v", err)
+	}
 	f, err := os.Create(fp.File)
 	if err != nil {
 		return fmt.Errorf("error making plan file: %v", err)

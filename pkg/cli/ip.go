@@ -16,21 +16,23 @@ type ipOpts struct {
 // NewCmdIP prints the cluster's IP
 func NewCmdIP(out io.Writer) *cobra.Command {
 	opts := &ipOpts{}
-
 	cmd := &cobra.Command{
-		Use:   "ip",
+		Use:   "ip CLUSTER_NAME",
 		Short: "retrieve the IP address of the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("Unexpected args: %v", args)
+			if len(args) != 1 {
+				return cmd.Usage()
 			}
-			planner := &install.FilePlanner{File: opts.planFilename}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			planPath, _, _ := generateDirsFromName(clusterName)
+			opts.planFilename = planPath
+			planner := &install.FilePlanner{File: planPath}
 			return doIP(out, planner, opts)
 		},
 	}
-
-	// PersistentFlags
-	cmd.PersistentFlags().StringVarP(&opts.planFilename, "plan-file", "f", "kismatic-cluster.yaml", "path to the installation plan file")
 
 	return cmd
 }

@@ -27,19 +27,22 @@ func NewCmdDashboard(in io.Reader, out io.Writer) *cobra.Command {
 	opts := &dashboardOpts{}
 
 	cmd := &cobra.Command{
-		Use:   "dashboard",
+		Use:   "dashboard CLUSTER_NAME",
 		Short: "Opens/displays the kubernetes dashboard URL of the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("Unexpected args: %v", args)
+			if len(args) != 1 {
+				return cmd.Usage()
 			}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			opts.planFilename, opts.generatedAssetsDir, _ = generateDirsFromName(clusterName)
 			return doDashboard(in, out, opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.generatedAssetsDir, "generated-assets-dir", "generated", "path to the directory where assets generated during the installation process will be stored")
 	cmd.Flags().BoolVar(&opts.dashboardURLMode, "url", false, "Display the kubernetes dashboard URL instead of opening it in the default browser")
-	addPlanFileFlag(cmd.PersistentFlags(), &opts.planFilename)
 	return cmd
 }
 

@@ -24,23 +24,29 @@ func NewCmdSSH(out io.Writer) *cobra.Command {
 	opts := &sshOpts{}
 
 	cmd := &cobra.Command{
-		Use:   "ssh HOST [commands]",
+		Use:   "ssh CLUSTER_NAME HOST [commands]",
 		Short: "ssh into a node in the cluster",
 		Long: `ssh into a node in the cluster
 
 HOST must be one of the following:
-- A hostname defined in the plan filepath
+- A hostname or IP defined in the plan file
 - An alias: master, etcd, worker, ingress or storage. This will ssh into the first defined node of that type.`,
+
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
+			if len(args) < 2 {
 				return cmd.Usage()
 			}
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			planPath, _, _ := generateDirsFromName(clusterName)
 			// get optional arguments
-			if len(args) > 1 {
+			if len(args) > 2 {
 				opts.arguments = args[1:]
 			}
-
-			opts.host = args[0]
+			opts.planFilename = planPath
+			opts.host = args[1]
 
 			planner := &install.FilePlanner{File: opts.planFilename}
 			// Check if plan file exists
@@ -57,7 +63,6 @@ HOST must be one of the following:
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.planFilename, "plan-file", "f", "kismatic-cluster.yaml", "path to the installation plan file")
 	cmd.Flags().BoolVarP(&opts.pty, "pty", "t", false, "force PTY \"-t\" flag on the SSH connection")
 
 	return cmd

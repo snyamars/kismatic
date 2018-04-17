@@ -24,18 +24,22 @@ type validateOpts struct {
 func NewCmdValidate(out io.Writer, installOpts *installOpts) *cobra.Command {
 	opts := &validateOpts{}
 	cmd := &cobra.Command{
-		Use:   "validate",
-		Short: "validate your plan file",
+		Use:   "validate CLUSTER_NAME",
+		Short: "validate your plan file for your cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("Unexpected args: %v", args)
+			if len(args) != 1 {
+				return cmd.Usage()
 			}
-			planner := &install.FilePlanner{File: installOpts.planFilename}
-			opts.planFile = installOpts.planFilename
+			clusterName := args[0]
+			if exists, err := CheckClusterExists(clusterName); !exists {
+				return err
+			}
+			planPath, generatedPath, _ := generateDirsFromName(clusterName)
+			opts.planFile, opts.generatedAssetsDir = planPath, generatedPath
+			planner := &install.FilePlanner{File: planPath}
 			return doValidate(out, planner, opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.generatedAssetsDir, "generated-assets-dir", "generated", "path to the directory where assets generated during the installation process will be stored")
 	cmd.Flags().BoolVar(&opts.verbose, "verbose", false, "enable verbose logging from the installation")
 	cmd.Flags().StringVarP(&opts.outputFormat, "output", "o", "simple", "installation output format (options simple|raw)")
 	cmd.Flags().BoolVar(&opts.skipPreFlight, "skip-preflight", false, "skip pre-flight checks")

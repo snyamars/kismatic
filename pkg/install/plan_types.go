@@ -3,6 +3,7 @@ package install
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 
 	"github.com/apprenda/kismatic/pkg/ssh"
@@ -84,6 +85,10 @@ type Plan struct {
 	Storage OptionalNodeGroup
 	// NFS volumes of the cluster.
 	NFS NFS
+}
+
+func (p Plan) Equal(op Plan) bool {
+	return reflect.DeepEqual(p, op)
 }
 
 type Provisioner struct {

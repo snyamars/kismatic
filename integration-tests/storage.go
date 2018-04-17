@@ -2,7 +2,6 @@ package integration_tests
 
 import (
 	"fmt"
-	"html/template"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -15,12 +14,8 @@ import (
 
 func testAddVolumeVerifyGluster(aws infrastructureProvisioner, distro linuxDistro) {
 	WithInfrastructure(NodeCount{Worker: 5}, distro, aws, func(nodes provisionedNodes, sshKey string) {
-		planFile, err := os.Create("kismatic-testing.yaml")
-		FailIfError(err, "error creating file for kismatic plan")
-		defer planFile.Close()
-
 		clusterNodes := nodes.worker[0:4]
-		standupGlusterCluster(planFile, clusterNodes, sshKey, distro)
+		standupGlusterCluster(clusterNodes, sshKey, distro)
 		storageNode := nodes.worker[0]
 
 		tests := []struct {
@@ -48,7 +43,7 @@ func testAddVolumeVerifyGluster(aws infrastructureProvisioner, distro linuxDistr
 		for _, test := range tests {
 			By(fmt.Sprintf("Setting up a volume with Replica = %d, Distributed = %d", test.replicaCount, test.distributionCount))
 			volumeName := fmt.Sprintf("gv-r%d-d%d", test.replicaCount, test.distributionCount)
-			err = createVolume(planFile, volumeName, test.replicaCount, test.distributionCount, "", nil)
+			err := createVolume(volumeName, test.replicaCount, test.distributionCount, "", nil)
 			FailIfError(err, "Failed to create volume")
 
 			By("Verifying gluster volume properties")
@@ -56,7 +51,7 @@ func testAddVolumeVerifyGluster(aws infrastructureProvisioner, distro linuxDistr
 		}
 
 		By("Creating a volume which allows access to nodes in the cluster")
-		err = createVolume(planFile, "foo", 1, 1, "", nil)
+		err := createVolume("foo", 1, 1, "", nil)
 		FailIfError(err, "Failed to create volume")
 
 		By("Installing NFS library on out-of-cluster node")
@@ -98,9 +93,8 @@ func verifyGlusterVolume(storageNode NodeDeets, sshKey string, name string, repl
 	FailIfError(err, "Gluster volume verification failed")
 }
 
-func createVolume(planFile *os.File, name string, replicationCount int, distributionCount int, reclaimPolicy string, accessModes []string) error {
-	cmd := exec.Command("./kismatic", "volume", "add",
-		"-f", planFile.Name(),
+func createVolume(name string, replicationCount int, distributionCount int, reclaimPolicy string, accessModes []string) error {
+	cmd := exec.Command("./kismatic", "volume", "add", name,
 		"--replica-count", strconv.Itoa(replicationCount),
 		"--distribution-count", strconv.Itoa(distributionCount),
 		"-c", "kismatic-test",
@@ -116,14 +110,14 @@ func createVolume(planFile *os.File, name string, replicationCount int, distribu
 	return cmd.Run()
 }
 
-func deleteVolume(planFile *os.File, name string) error {
-	cmd := exec.Command("./kismatic", "volume", "delete", "-f", planFile.Name(), name, "--force")
+func deleteVolume(name string) error {
+	cmd := exec.Command("./kismatic", "volume", "delete", defaultClusterName, name, "--force")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-func standupGlusterCluster(planFile *os.File, nodes []NodeDeets, sshKey string, distro linuxDistro) {
+func standupGlusterCluster(nodes []NodeDeets, sshKey string, distro linuxDistro) {
 	By("Setting up a plan file with storage nodes")
 	plan := PlanAWS{
 		Etcd:                nodes,
@@ -136,17 +130,14 @@ func standupGlusterCluster(planFile *os.File, nodes []NodeDeets, sshKey string, 
 		SSHUser:             nodes[0].SSHUser,
 	}
 	By("Writing plan file out to disk")
-	template, err := template.New("planAWSOverlay").Parse(planAWSOverlay)
-	FailIfError(err, "Couldn't parse template")
-
-	err = template.Execute(planFile, &plan)
-	FailIfError(err, "Error filling in plan template")
+	writePlanFile(plan)
 	if distro == Ubuntu1604LTS { // Ubuntu doesn't have python installed
 		By("Running the all play with the plan")
-		cmd := exec.Command("./kismatic", "install", "step", "_all.yaml", "-f", planFile.Name())
+
+		cmd := exec.Command("./kismatic", "install", "step", defaultClusterName, "all")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		err = cmd.Run()
+		err := cmd.Run()
 		FailIfError(err, "Error running all play")
 	}
 	By("Mocking kubectl on the first master node")
@@ -164,14 +155,14 @@ func standupGlusterCluster(planFile *os.File, nodes []NodeDeets, sshKey string, 
 	FailIfError(err, "Error setting permissions on kubectl dummy")
 
 	By("Running the packages-repo play with the plan")
-	cmd := exec.Command("./kismatic", "install", "step", "_packages-repo.yaml", "-f", planFile.Name())
+	cmd := exec.Command("./kismatic", "install", "step", defaultClusterName, "packages-repo")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	FailIfError(err, "Error running package-repo play")
 
 	By("Running the storage play with the plan")
-	cmd = exec.Command("./kismatic", "install", "step", "_storage.yaml", "-f", planFile.Name())
+	cmd = exec.Command("./kismatic", "install", "step", defaultClusterName, "storage")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
@@ -189,13 +180,9 @@ func testStatefulWorkload(nodes provisionedNodes, sshKey string) error {
 	}
 
 	By("Creating a storage volume")
-	plan, err := os.Open("kismatic-testing.yaml")
-	if err != nil {
-		return fmt.Errorf("Failed to open plan file: %v", err)
-	}
 	reclaimPolicy := "Recycle"
 	accessModes := []string{"ReadWriteMany", "ReadOnlyMany"}
-	err = createVolume(plan, "kis-int-test", 2, 1, reclaimPolicy, accessModes)
+	err := createVolume("kis-int-test", 2, 1, reclaimPolicy, accessModes)
 	if err != nil {
 		return fmt.Errorf("Failed to create volume: %v", err)
 	}
@@ -247,7 +234,7 @@ func testStatefulWorkload(nodes provisionedNodes, sshKey string) error {
 	}
 
 	By("Deleting the storage volume")
-	err = deleteVolume(plan, "kis-int-test")
+	err = deleteVolume("kis-int-test")
 	if err != nil {
 		return fmt.Errorf("Failed to delete volume: %v", err)
 	}
@@ -259,7 +246,7 @@ func testStatefulWorkload(nodes provisionedNodes, sshKey string) error {
 	}
 
 	By("Creating a storage volume with the same name as a deleted volume")
-	err = createVolume(plan, "kis-int-test", 2, 1, reclaimPolicy, accessModes)
+	err = createVolume("kis-int-test", 2, 1, reclaimPolicy, accessModes)
 	if err != nil {
 		return fmt.Errorf("Failed to create volume: %v", err)
 	}

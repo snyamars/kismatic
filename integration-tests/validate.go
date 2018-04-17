@@ -1,9 +1,7 @@
 package integration_tests
 
 import (
-	"bufio"
 	"fmt"
-	"html/template"
 	"log"
 	"os"
 	"os/exec"
@@ -76,11 +74,6 @@ func validateMiniPkgInstallationDisabled(provisioner infrastructureProvisioner, 
 // ValidateKismaticMini runs validation against a mini Kubernetes cluster
 func ValidateKismaticMini(node NodeDeets, user, sshKey string) PlanAWS {
 	By("Building a template")
-	template, err := template.New("planAWSOverlay").Parse(planAWSOverlay)
-	FailIfError(err, "Couldn't parse template")
-
-	log.Printf("Created single node for Kismatic Mini: %s (%s)", node.id, node.PublicIP)
-	By("Building a plan to set up an overlay network cluster on this hardware")
 	plan := PlanAWS{
 		Etcd:                []NodeDeets{node},
 		Master:              []NodeDeets{node},
@@ -90,30 +83,18 @@ func ValidateKismaticMini(node NodeDeets, user, sshKey string) PlanAWS {
 		SSHUser:             user,
 		SSHKeyFile:          sshKey,
 	}
-
-	// Create template file
-	f, fileErr := os.Create("kismatic-testing.yaml")
-	FailIfError(fileErr, "Error waiting for nodes")
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	execErr := template.Execute(w, &plan)
-	FailIfError(execErr, "Error filling in plan template")
-	w.Flush()
+	writePlanFile(plan)
+	log.Printf("Created single node for Kismatic Mini: %s (%s)", node.id, node.PublicIP)
 
 	// Run validation
 	By("Validate our plan")
-	err = runValidate(f.Name())
+	err := runValidate(clusterPath)
 	FailIfError(err, "Error validating plan")
 	return plan
 }
 
 func ValidateKismaticMiniDenyPkgInstallation(node NodeDeets, sshUser, sshKey string) error {
 	By("Building a template")
-	template, err := template.New("planAWSOverlay").Parse(planAWSOverlay)
-	FailIfError(err, "Couldn't parse template")
-
-	log.Printf("Created single node for Kismatic Mini: %s (%s)", node.id, node.PublicIP)
-	By("Building a plan to set up an overlay network cluster on this hardware")
 	plan := PlanAWS{
 		DisablePackageInstallation: true,
 		Etcd:                []NodeDeets{node},
@@ -126,28 +107,16 @@ func ValidateKismaticMiniDenyPkgInstallation(node NodeDeets, sshUser, sshKey str
 		SSHUser:             sshUser,
 		SSHKeyFile:          sshKey,
 	}
-
-	// Create template file
-	f, fileErr := os.Create("kismatic-testing.yaml")
-	FailIfError(fileErr, "Error waiting for nodes")
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	execErr := template.Execute(w, &plan)
-	FailIfError(execErr, "Error filling in plan template")
-	w.Flush()
+	writePlanFile(plan)
+	log.Printf("Created single node for Kismatic Mini: %s (%s)", node.id, node.PublicIP)
 
 	// Run validation
 	By("Validate our plan")
-	return runValidate(f.Name())
+	return runValidate(clusterPath)
 }
 
 func ValidateKismaticMiniWithBadSSH(node NodeDeets, user, sshKey string) PlanAWS {
 	By("Building a template")
-	template, err := template.New("planAWSOverlay").Parse(planAWSOverlay)
-	FailIfError(err, "Couldn't parse template")
-
-	log.Printf("Created single node for Kismatic Mini: %s (%s)", node.id, node.PublicIP)
-	By("Building a plan to set up an overlay network cluster on this hardware")
 	plan := PlanAWS{
 		Etcd:                []NodeDeets{node},
 		Master:              []NodeDeets{node},
@@ -157,19 +126,12 @@ func ValidateKismaticMiniWithBadSSH(node NodeDeets, user, sshKey string) PlanAWS
 		SSHUser:             user,
 		SSHKeyFile:          sshKey,
 	}
-
-	// Create template file
-	f, fileErr := os.Create("kismatic-testing.yaml")
-	FailIfError(fileErr, "Error waiting for nodes")
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	execErr := template.Execute(w, &plan)
-	FailIfError(execErr, "Error filling in plan template")
-	w.Flush()
+	writePlanFile(plan)
+	log.Printf("Created single node for Kismatic Mini: %s (%s)", node.id, node.PublicIP)
 
 	// Run validation
 	By("Validate our plan")
-	err = runValidate(f.Name())
+	err := runValidate(clusterPath)
 	FailIfSuccess(err)
 	return plan
 }
@@ -189,7 +151,8 @@ func getBadSSHKeyFile() (string, error) {
 }
 
 func runValidate(planFile string) error {
-	cmd := exec.Command("./kismatic", "install", "validate", "-f", planFile)
+
+	cmd := exec.Command("./kismatic", "install", "validate", defaultClusterName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

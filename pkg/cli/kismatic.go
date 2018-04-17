@@ -20,6 +20,7 @@ more documentation is available at https://github.com/apprenda/kismatic`,
 		SilenceErrors: true,
 	}
 
+	cmd.AddCommand(NewCmdImport(out))
 	cmd.AddCommand(NewCmdVersion(buildDate, out))
 	cmd.AddCommand(NewCmdInstall(in, out))
 	cmd.AddCommand(NewCmdVolume(in, out))
