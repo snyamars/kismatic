@@ -27,16 +27,19 @@ func NewCmdPlan(in io.Reader, out io.Writer) *cobra.Command {
 			defer clusterStore.Close()
 			planner := install.FilePlanner{}
 
-			plan, err := doPlan(in, out, planner, clusterStore)
+			updatedPlan, err := doPlan(in, out, planner, clusterStore)
 			state := store.Planned
+			fmt.Println("testing6")
 			if err != nil {
 				return err
 			}
-			if plan.Provisioner.Provider == "" { // consider the cluster unmanaged IFF the user doesn't want a cloud provider, emulating the 1.0 workflow
+			fmt.Println("testing7")
+			fmt.Println(updatedPlan)
+			if updatedPlan.Provisioner.Provider == "" { // consider the cluster unmanaged IFF the user doesn't want a cloud provider, emulating the 1.0 workflow
 				state = store.Unmanaged
 			}
-			spec := plan.ConvertToSpec(state)
-			return clusterStore.Put(plan.Cluster.Name, spec)
+			spec := updatedPlan.ConvertToSpec(state)
+			return clusterStore.Put(updatedPlan.Cluster.Name, spec)
 		},
 	}
 
@@ -142,13 +145,17 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 	fmt.Fprintf(out, "- %d storage nodes\n", storageNodes)
 	fmt.Fprintf(out, "- %d nfs volumes\n", nfsVolumes)
 	fmt.Fprintln(out)
-
+	fmt.Println("testing1")
 	// If we are using KET to provision infrastructure, use the template file
 	// defined by the infrastructure provider. Otherwise, generate the template
 	// as we always have.
 	if provider != "" {
 		templater := plan.ProviderTemplatePlanner{ProvidersDir: providersDir}
+		fmt.Println("testing2")
+
 		planTemplate, err := templater.GetPlanTemplate(provider)
+		fmt.Println("testing3")
+
 		if err != nil {
 			return nil, err
 		}
@@ -159,8 +166,10 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 		planTemplate.Worker.ExpectedCount = workerNodes
 		planTemplate.Ingress.ExpectedCount = ingressNodes
 		planTemplate.Storage.ExpectedCount = storageNodes
-
-		return nil, planner.Write(planTemplate)
+		fmt.Println(planTemplate)
+		if err := planner.Write(planTemplate); err != nil {
+			return nil, err
+		}
 	}
 
 	planTemplate := install.PlanTemplateOptions{
@@ -173,17 +182,19 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 		StorageNodes:              storageNodes,
 		NFSVolumes:                nfsVolumes,
 	}
+
 	if err = install.WritePlanTemplate(planTemplate, &planner); err != nil {
 		return nil, fmt.Errorf("error planning installation: %v", err)
 	}
 
 	fmt.Fprintf(out, "Wrote plan file template to %q\n", planner.File)
 	fmt.Fprintf(out, "Edit the plan file to further describe your cluster. Once ready, execute the \"validate\" command to proceed.\n")
-	plan, err := planner.Read()
+	planFromFile, err := planner.Read()
 	if err != nil {
 		return nil, err
 	}
-	return plan, nil
+
+	return planFromFile, nil
 }
 
 func availableInfraProviders(providersDir string) ([]string, error) {

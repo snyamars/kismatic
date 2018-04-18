@@ -323,7 +323,7 @@ func (fp *FilePlanner) Write(p *Plan) error {
 		}
 		addNewLineBeforeComment = true
 	}
-
+	fmt.Println("testing5")
 	return nil
 }
 

@@ -32,6 +32,9 @@ endif
 ifeq ($(origin HOST_GOARCH), undefined)
 	HOST_GOARCH := $(shell go env GOARCH)
 endif
+ifeq ($(origin GOPATH), undefined)
+	GOPATH := $(shell go env GOPATH)
+endif
 # Used by the integration tests to tag nodes
 ifeq ($(origin CREATED_BY), undefined)
 	CREATED_BY := $(shell hostname)
@@ -320,7 +323,7 @@ tools/glide-$(HOST_GOOS)-$(HOST_GOARCH):
 	mkdir -p tools
 	curl -L https://github.com/Masterminds/glide/releases/download/$(GLIDE_VERSION)/glide-$(GLIDE_VERSION)-$(HOST_GOOS)-$(HOST_GOARCH).tar.gz | tar -xz -C tools
 	mv tools/$(HOST_GOOS)-$(HOST_GOARCH)/glide tools/glide-$(HOST_GOOS)-$(HOST_GOARCH)
-	rm -r tools/$(HOST_GOOS)-$(HOST_GOARCH)
+	rm -r tools/$(HOST_GOOS)-$(HOST_GOARCH)	
 
 vendor-ansible/out:
 	mkdir -p vendor-ansible/out
@@ -369,6 +372,13 @@ docker-release:
 	docker build . --no-cache --tag apprenda/kismatic
 	docker push apprenda/kismatic
 	
+get-vbox-provider:
+	go get github.com/terra-farm/terraform-provider-virtualbox
+	mkdir -p ~/.terraform.d/plugins/$(GOOS)_$(GOARCH)
+	mkdir -p vendor-terraform/$(GOOS)-$(GOARCH)
+	cp $(GOPATH)/bin/terraform-provider-virtualbox ~/.terraform.d/plugins/$(GOOS)_$(GOARCH)
+	curl -L http://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-vagrant.box -o vendor-terraform/ubuntu1604.box
+
 get-ginkgo:
 	go get github.com/onsi/ginkgo/ginkgo
 	cd integration-tests
