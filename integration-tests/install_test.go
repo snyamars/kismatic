@@ -29,11 +29,11 @@ var _ = Describe("kismatic", func() {
 		})
 	})
 
-	Describe("Calling 'install plan'", func() {
+	Describe("Calling 'plan'", func() {
 		Context("and just hitting enter", func() {
 			It("should result in the output of a well formed default plan file", func() {
 				By("Outputing a file")
-				c := exec.Command("./kismatic", "install", "plan")
+				c := exec.Command("./kismatic", "plan")
 				helpbytes, helperr := c.Output()
 				Expect(helperr).To(BeNil())
 				helpText := string(helpbytes)
@@ -72,7 +72,7 @@ var _ = Describe("kismatic", func() {
 		})
 	})
 
-	Describe("calling install apply", func() {
+	Describe("calling apply", func() {
 		Context("when targeting non-existent infrastructure", func() {
 			It("should fail in a reasonable amount of time", func() {
 				if !completesInTime(installKismaticWithABadNode, 600*time.Second) {
