@@ -14,23 +14,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-const (
-	planning        = "planning"
-	planningFailed  = "planningFailed"
-	planned         = "planned"
-	provisioning    = "provisioning"
-	provisionFailed = "provisionFailed"
-	provisioned     = "provisioned"
-	installing      = "installing"
-	installFailed   = "installFailed"
-	installed       = "installed"
-	modifying       = "modifying"
-	modifyFailed    = "modifyFailed"
-	destroying      = "destroying"
-	destroyFailed   = "destroyFailed"
-	destroyed       = "destroyed"
-)
-
 // The Planner returns a plan template for the given infrastructure provider
 type Planner interface {
 	GetPlanTemplate(provider string) (*install.Plan, error)
@@ -64,8 +47,8 @@ func (c *clusterController) run(watch <-chan struct{}) {
 		c.log.Printf("cluster %q - current state: %s, desired state: %s, waiting for retry: %v", c.clusterName, cluster.Status.CurrentState, cluster.Spec.DesiredState, cluster.Status.WaitingForManualRetry)
 
 		// If the cluster spec has changed and we are not trying to destroy, we need to plan again
-		if !cmp.Equal(cluster.Spec, c.clusterSpec) && cluster.Spec.DesiredState != destroyed {
-			cluster.Status.CurrentState = planning
+		if !cmp.Equal(cluster.Spec, c.clusterSpec) && cluster.Spec.DesiredState != store.Destroyed {
+			cluster.Status.CurrentState = store.Planning
 		}
 
 		// If we have reached the desired state or we are waiting for a manual
@@ -100,7 +83,7 @@ func (c *clusterController) run(watch <-chan struct{}) {
 
 		// If the cluster has been destroyed, remove the cluster from the store
 		// and stop the controller
-		if cluster.Status.CurrentState == destroyed {
+		if cluster.Status.CurrentState == store.Destroyed {
 			err := c.clusterStore.Delete(c.clusterName)
 			if err != nil {
 				// At this point, the cluster has already been destroyed, but we
@@ -128,50 +111,50 @@ func (c *clusterController) transition(cluster store.Cluster) store.Cluster {
 	// Figure out where to go from the current state
 	switch cluster.Status.CurrentState {
 	case "": // This is the initial state
-		cluster.Status.CurrentState = planning
+		cluster.Status.CurrentState = store.Planning
 		return cluster
-	case planning:
+	case store.Planning:
 		return c.plan(cluster)
-	case planned:
-		cluster.Status.CurrentState = provisioning
+	case store.Planned:
+		cluster.Status.CurrentState = store.Provisioning
 		return cluster
-	case planningFailed:
-		if cluster.Spec.DesiredState == destroyed {
-			cluster.Status.CurrentState = destroying
+	case store.PlanningFailed:
+		if cluster.Spec.DesiredState == store.Destroyed {
+			cluster.Status.CurrentState = store.Destroying
 			return cluster
 		}
-		cluster.Status.CurrentState = planning
+		cluster.Status.CurrentState = store.Planning
 		return cluster
-	case provisioning:
+	case store.Provisioning:
 		return c.provision(cluster)
-	case provisioned:
-		if cluster.Spec.DesiredState == destroyed {
-			cluster.Status.CurrentState = destroying
+	case store.Provisioned:
+		if cluster.Spec.DesiredState == store.Destroyed {
+			cluster.Status.CurrentState = store.Destroying
 			return cluster
 		}
-		cluster.Status.CurrentState = installing
+		cluster.Status.CurrentState = store.Installing
 		return cluster
-	case provisionFailed:
-		if cluster.Spec.DesiredState == destroyed {
-			cluster.Status.CurrentState = destroying
+	case store.ProvisionFailed:
+		if cluster.Spec.DesiredState == store.Destroyed {
+			cluster.Status.CurrentState = store.Destroying
 			return cluster
 		}
-		cluster.Status.CurrentState = provisioning
+		cluster.Status.CurrentState = store.Provisioning
 		return cluster
-	case destroying:
+	case store.Destroying:
 		return c.destroy(cluster)
-	case installing:
+	case store.Installing:
 		return c.install(cluster)
-	case installFailed:
-		if cluster.Spec.DesiredState == destroyed {
-			cluster.Status.CurrentState = destroying
+	case store.InstallFailed:
+		if cluster.Spec.DesiredState == store.Destroyed {
+			cluster.Status.CurrentState = store.Destroying
 			return cluster
 		}
-		cluster.Status.CurrentState = installing
+		cluster.Status.CurrentState = store.Installing
 		return cluster
-	case installed:
-		if cluster.Spec.DesiredState == destroyed {
-			cluster.Status.CurrentState = destroying
+	case store.Installed:
+		if cluster.Spec.DesiredState == store.Destroyed {
+			cluster.Status.CurrentState = store.Destroying
 			return cluster
 		}
 		c.log.Printf("cluster %q: cannot transition to %q from the 'installed' state", c.clusterName, cluster.Spec.DesiredState)
@@ -194,7 +177,7 @@ func (c *clusterController) plan(cluster store.Cluster) store.Cluster {
 	// Create the assets dir if it does not exist
 	if err := os.MkdirAll(c.clusterAssetsDir, 0700); err != nil {
 		c.log.Printf("error creating the assets directory: %v", err)
-		cluster.Status.CurrentState = planningFailed
+		cluster.Status.CurrentState = store.PlanningFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
@@ -203,11 +186,11 @@ func (c *clusterController) plan(cluster store.Cluster) store.Cluster {
 	err := c.writePlanFile(c.clusterName, fp, cluster.Spec)
 	if err != nil {
 		c.log.Printf("error planning installation for cluster %q: %v", c.clusterName, err)
-		cluster.Status.CurrentState = planningFailed
+		cluster.Status.CurrentState = store.PlanningFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
-	cluster.Status.CurrentState = planned
+	cluster.Status.CurrentState = store.Planned
 	return cluster
 }
 
@@ -222,7 +205,7 @@ func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 	plan, err := fp.Read()
 	if err != nil {
 		c.log.Printf("error provisioning infrastructure for cluster %q: %v", c.clusterName, err)
-		cluster.Status.CurrentState = provisionFailed
+		cluster.Status.CurrentState = store.ProvisionFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
@@ -232,17 +215,17 @@ func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 	updatedPlan, err := provisioner.Provision(*plan, opts)
 	if err != nil {
 		c.log.Printf("error provisioning infrastructure for cluster %q: %v", c.clusterName, err)
-		cluster.Status.CurrentState = provisionFailed
+		cluster.Status.CurrentState = store.ProvisionFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
 	if err := fp.Write(updatedPlan); err != nil {
 		c.log.Printf("error writing updated plan file: %v", err)
-		cluster.Status.CurrentState = provisionFailed
+		cluster.Status.CurrentState = store.ProvisionFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
-	cluster.Status.CurrentState = provisioned
+	cluster.Status.CurrentState = store.Provisioned
 	cluster.Status.ClusterIP = updatedPlan.Master.LoadBalancedFQDN
 	return cluster
 }
@@ -252,11 +235,11 @@ func (c *clusterController) destroy(cluster store.Cluster) store.Cluster {
 	provisioner := c.newProvisioner(c.logFile)
 	if err := provisioner.Destroy(cluster.Spec.Provisioner.Provider, c.clusterName); err != nil {
 		c.log.Printf("error destroying cluster %q: %v", c.clusterName, err)
-		cluster.Status.CurrentState = destroyFailed
+		cluster.Status.CurrentState = store.DestroyFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
-	cluster.Status.CurrentState = destroyed
+	cluster.Status.CurrentState = store.Destroyed
 	return cluster
 }
 
@@ -266,7 +249,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	plan, err := fp.Read()
 	if err != nil {
 		c.log.Printf("cluster %q: error reading plan file: %v", c.clusterName, err)
-		cluster.Status.CurrentState = installFailed
+		cluster.Status.CurrentState = store.InstallFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
@@ -274,7 +257,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	err = c.executor.RunPreFlightCheck(plan)
 	if err != nil {
 		c.log.Printf("cluster %q: error running preflight checks: %v", c.clusterName, err)
-		cluster.Status.CurrentState = installFailed
+		cluster.Status.CurrentState = store.InstallFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
@@ -282,7 +265,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	err = c.executor.GenerateCertificates(plan, false)
 	if err != nil {
 		c.log.Printf("cluster %q: error generating certificates: %v", c.clusterName, err)
-		cluster.Status.CurrentState = installFailed
+		cluster.Status.CurrentState = store.InstallFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
@@ -290,7 +273,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	err = c.executor.GenerateKubeconfig(*plan)
 	if err != nil {
 		c.log.Printf("cluster %q: error generating kubeconfig file: %v", c.clusterName, err)
-		cluster.Status.CurrentState = installFailed
+		cluster.Status.CurrentState = store.InstallFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
@@ -298,7 +281,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	err = c.executor.Install(plan, true)
 	if err != nil {
 		c.log.Printf("cluster %q: error installing the cluster: %v", c.clusterName, err)
-		cluster.Status.CurrentState = installFailed
+		cluster.Status.CurrentState = store.InstallFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
@@ -306,18 +289,18 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	// Skip the smoketest if the user asked us to skip the installation of a
 	// networking stack
 	if !plan.NetworkConfigured() {
-		cluster.Status.CurrentState = installed
+		cluster.Status.CurrentState = store.Installed
 		return cluster
 	}
 
 	err = c.executor.RunSmokeTest(plan)
 	if err != nil {
 		c.log.Printf("cluster %q: error running smoke test against the cluster: %v", c.clusterName, err)
-		cluster.Status.CurrentState = installFailed
+		cluster.Status.CurrentState = store.InstallFailed
 		return cluster
 	}
 
-	cluster.Status.CurrentState = installed
+	cluster.Status.CurrentState = store.Installed
 	return cluster
 }
 

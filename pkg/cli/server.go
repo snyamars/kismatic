@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	nethttp "net/http"
 	"os"
 	"os/signal"
@@ -61,30 +60,14 @@ If cert-file or key-file are not provided, a self-signed CA will be used to crea
 	cmd.Flags().StringVarP(&options.port, "port", "p", "", "port to start the server on. Defaults to 8443, or 8080 when TLS is disabled.")
 	cmd.Flags().StringVar(&options.certFile, "cert-file", "", "path to the TLS cert file")
 	cmd.Flags().StringVar(&options.keyFile, "key-file", "", "path to the TLS key file")
-	cmd.Flags().StringVar(&options.dbFile, "db-file", filepath.Join(assetsFolder, "server.db"), "path to the database file")
+	cmd.Flags().StringVar(&options.dbFile, "db-file", filepath.Join(assetsFolder, defaultDBName), "path to the database file\nNOTE: If you care about CLI integration (IE, being able to interface with clusters created with the server via the CLI), this flag needs to be left blank")
 	cmd.Flags().BoolVar(&options.disableTLS, "insecure-disable-tls", false, "set to true to disable TLS")
 	return cmd
 }
 
 func doServer(stdout io.Writer, options serverOptions) error {
-	logger := log.New(stdout, "[kismatic] ", log.LstdFlags|log.Lshortfile)
-	parent, _ := filepath.Split(options.dbFile)
-	if err := os.MkdirAll(parent, 0700); err != nil {
-		logger.Fatalf("Error creating store directory structure: %v", err)
-	}
-	// Create the store
-	s, err := store.New(options.dbFile, 0600, logger)
-	if err != nil {
-		logger.Fatalf("Error creating store: %v", err)
-	}
-	defer s.Close()
-	err = s.CreateBucket(clustersBucket)
-	if err != nil {
-		logger.Fatalf("Error creating bucket in store: %v", err)
-	}
-
-	clusterStore := store.NewClusterStore(s, clustersBucket)
-
+	clusterStore, logger := CreateStoreIfNotExists(options.dbFile)
+	defer clusterStore.Close()
 	// Create a dir where all the controller-related files will be stored
 	// Needs to be an absoulute path for the HTTP server
 	pwd, err := os.Getwd()

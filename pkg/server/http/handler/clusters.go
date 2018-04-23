@@ -18,8 +18,8 @@ import (
 var (
 	// ErrClusterNotFound is the error returned by the API when a requested cluster
 	// is not found in the server.
-	ErrClusterNotFound = errors.New("cluster details not found in the store")
-
+	ErrClusterNotFound  = errors.New("cluster details not found in the store")
+	ErrUnmanagedCluster = errors.New("unmanaged clusters cannot be created, edited, or destroyed with the API")
 	// the states that can be requested through the API
 	validStates = []string{"planned", "provisioned", "installed"}
 )
@@ -172,6 +172,8 @@ func (api Clusters) Update(w http.ResponseWriter, r *http.Request, p httprouter.
 	if err != nil {
 		if err == ErrClusterNotFound {
 			w.WriteHeader(http.StatusNotFound)
+		} else if err == ErrUnmanagedCluster {
+			w.WriteHeader(http.StatusPreconditionFailed)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
@@ -283,6 +285,8 @@ func (api Clusters) Delete(w http.ResponseWriter, r *http.Request, p httprouter.
 	if err != nil {
 		if err == ErrClusterNotFound {
 			w.WriteHeader(http.StatusNotFound)
+		} else if err == ErrUnmanagedCluster {
+			w.WriteHeader(http.StatusPreconditionFailed)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
@@ -413,6 +417,9 @@ func getFromStore(name string, cs store.ClusterStore) (*store.Cluster, error) {
 	}
 	if sc == nil {
 		return nil, ErrClusterNotFound
+	}
+	if sc.Spec.DesiredState == store.Unmanaged || sc.Status.CurrentState == store.Unmanaged {
+		return nil, ErrUnmanagedCluster
 	}
 	return sc, nil
 }

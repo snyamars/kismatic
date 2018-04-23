@@ -399,8 +399,22 @@ docs/generate-plan-file-reference.md:
 docs/generate-swagger.json:
 	GOROOT=$(shell go env GOROOT) tools/swagger-$(HOST_GOOS)-$(HOST_GOARCH) generate spec -b ./pkg/server 
 
+# IMPORTANT: you need to add $GOROOT to your exported dirs on docker for macOS (Docker > Preferences > File Sharin)
+# If using homebrew, /usr/local/Cellar should cover everything
 docs/update-swagger.json: 
-	GOROOT=$(shell go env GOROOT) tools/swagger-$(HOST_GOOS)-$(HOST_GOARCH) generate spec -b ./pkg/server > docs/swagger.json
+	@echo "Updating swagger spec inside container"
+	@docker run                                \
+	    --rm                                   \
+	    -e GOOS="$(GOOS)"                      \
+	    -e HOST_GOOS="linux"                   \
+	    -e VERSION="$(VERSION)"                \
+	    -e BUILD_DATE="$(BUILD_DATE)"          \
+	    -u root:root                           \
+	    -v "$(shell pwd)":"/go/src/$(PKG)"     \
+        -v "$(shell go env GOROOT)":"$(shell go env GOROOT)" \
+	    -w "/go/src/$(PKG)"                    \
+	    circleci/golang:$(GO_VERSION)          \
+	    ./tools/swagger-linux-$(HOST_GOARCH) generate spec -b ./pkg/server > docs/swagger.json
 	
 
 version:

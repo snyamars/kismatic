@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/apprenda/kismatic/pkg/install"
@@ -33,7 +34,10 @@ WARNING all data in the volume will be lost.`,
 				return cmd.Usage()
 			}
 			clusterName := args[0]
-			if exists, err := CheckClusterExists(clusterName); !exists {
+			dbPath := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(dbPath)
+			defer s.Close()
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
 				return err
 			}
 			planPath, generatedPath, _ := generateDirsFromName(clusterName)

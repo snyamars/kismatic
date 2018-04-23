@@ -9,6 +9,7 @@ import (
 
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/provision"
+	"github.com/apprenda/kismatic/pkg/store"
 
 	"github.com/spf13/cobra"
 )
@@ -24,7 +25,10 @@ func NewCmdProvision(in io.Reader, out io.Writer) *cobra.Command {
 				return cmd.Usage()
 			}
 			clusterName := args[0]
-			if exists, err := CheckClusterExists(clusterName); !exists {
+			dbPath := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(dbPath)
+			defer s.Close()
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
 				return err
 			}
 			planPath, _, _ := generateDirsFromName(clusterName)
@@ -52,14 +56,19 @@ func NewCmdProvision(in io.Reader, out io.Writer) *cobra.Command {
 				SecretsGetter:   environmentSecretsGetter{},
 			}
 
-			updatedPlan, err := tf.Provision(*plan, provisionOpts)
-			if err != nil {
-				return err
+			updatedPlan, provErr := tf.Provision(*plan, provisionOpts)
+			spec := updatedPlan.ConvertToSpec(store.Provisioned)
+			if provErr != nil {
+				spec.Status.CurrentState = store.ProvisionFailed
+				if err := s.Put(updatedPlan.Cluster.Name, spec); err != nil {
+					return fmt.Errorf("%v: %v", provErr, err)
+				}
+				return provErr
 			}
 			if err := fp.Write(updatedPlan); err != nil {
 				return fmt.Errorf("error writing updated plan file to %s: %v", planPath, err)
 			}
-			return nil
+			return s.Put(updatedPlan.Cluster.Name, spec)
 		},
 	}
 	cmd.Flags().BoolVar(&provisionOpts.AllowDestruction, "allow-destruction", false, "Allows possible infrastructure destruction through provisioner planning, required if mutation is scaling down (Use with care)")
@@ -76,7 +85,10 @@ func NewCmdDestroy(in io.Reader, out io.Writer) *cobra.Command {
 				return cmd.Usage()
 			}
 			clusterName := args[0]
-			if exists, err := CheckClusterExists(clusterName); !exists {
+			dbPath := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(dbPath)
+			defer s.Close()
+			if exists, err := CheckClusterExists(clusterName, s); !exists {
 				return err
 			}
 			planPath, _, _ := generateDirsFromName(clusterName)
@@ -97,9 +109,11 @@ func NewCmdDestroy(in io.Reader, out io.Writer) *cobra.Command {
 				StateDir:        filepath.Join(path, assetsFolder),
 				SecretsGetter:   environmentSecretsGetter{},
 			}
-			// TODO: also purge from database/filesystem - separate command?
-			// MOVED TO "RMI" PR
-			return tf.Destroy(plan.Provisioner.Provider, plan.Cluster.Name)
+			if err := tf.Destroy(plan.Provisioner.Provider, plan.Cluster.Name); err != nil {
+				return err
+			}
+			// No point in committing a state update to the database, just remove the entry.
+			return doRemove(out, clusterName, s)
 		},
 	}
 	return cmd

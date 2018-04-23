@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/apprenda/kismatic/pkg/store"
+
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/util"
 
@@ -17,10 +19,8 @@ type importOpts struct {
 	dstGeneratedAssetsDir string
 	srcRunsDir            string
 	dstRunsDir            string
-	// srcKeyFile            string
-	// dstKeyFile            string
-	srcPlanFilePath string
-	dstPlanFilePath string
+	srcPlanFilePath       string
+	dstPlanFilePath       string
 }
 
 // NewCmdImport imports a cluster plan, and potentially a generated or runs dir
@@ -37,6 +37,9 @@ func NewCmdImport(out io.Writer) *cobra.Command {
 			}
 			opts.srcPlanFilePath = args[0]
 			opts.srcGeneratedAssetsDir = args[1]
+			path := filepath.Join(assetsFolder, defaultDBName)
+			s, _ := CreateStoreIfNotExists(path)
+			defer s.Close()
 			fp := install.FilePlanner{File: opts.srcPlanFilePath}
 			if !fp.PlanExists() {
 				return planFileNotFoundErr{filename: opts.srcPlanFilePath}
@@ -53,14 +56,19 @@ func NewCmdImport(out io.Writer) *cobra.Command {
 			if err := os.MkdirAll(parent, 0700); err != nil {
 				return fmt.Errorf("error creating destination %s: %v", parent, err)
 			}
-			exists, err := CheckClusterExists(clusterName)
+			exists, err := CheckClusterExists(clusterName, s)
 			if exists {
 				if err != nil {
-					return fmt.Errorf("cluster with name %s already exists, cannot import: %v", clusterName, err)
+					return fmt.Errorf("error importing cluster %q: %v", clusterName, err)
 				}
-				return fmt.Errorf("cluster with name %s already exists, cannot import", clusterName)
+				return fmt.Errorf("cluster with name %q already exists, will not import", clusterName)
 			}
-			return doImport(out, clusterName, opts)
+			spec := plan.ConvertToSpec(store.Unmanaged)
+			// No need for an "unmanagedFailed" state. If the import fails, simply don't add it to the db.
+			if impErr := doImport(out, clusterName, opts); impErr != nil {
+				return impErr
+			}
+			return s.Put(clusterName, spec)
 		},
 	}
 	cmd.Flags().StringVar(&opts.srcRunsDir, "runs-dir", "", "path to the directory where artifacts created during the installation process were stored")
