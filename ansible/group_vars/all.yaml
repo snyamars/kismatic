@@ -9,7 +9,7 @@ glusterfs_server_version_ubuntu: "3.8.15-ubuntu1~xenial1"
 
 #===============================================================================
 # common variables for all hosts
-init_system_dir: /etc/systemd/system/
+init_system_dir: /etc/systemd/system
 init_system_file_extenstion: service
 bin_dir: /usr/bin
 #===============================================================================
@@ -83,7 +83,8 @@ contiv:
 # directories
 kubernetes_install_dir: /etc/kubernetes
 kubernetes_spec_dir: /etc/kubernetes/specs
-network_plugin_dir: /etc/cni/net.d
+network_cni_dir: /etc/cni
+network_plugin_dir: "{{ network_cni_dir }}/net.d"
 kubernetes_auth_dir: /etc/kubernetes/auth
 kubelet_lib_dir: /var/lib/kubelet
 kubelet_pod_manifests_dir: /etc/kubernetes/manifests
@@ -99,6 +100,7 @@ kubernetes_kubeconfig:
   controller_manager: "{{kubernetes_install_dir}}/controller-manager.conf"
   scheduler: "{{kubernetes_install_dir}}/scheduler.conf"
   kubelet: "{{kubernetes_install_dir}}/kubelet.conf"
+  rescheduler: "{{kubernetes_install_dir}}/rescheduler.conf"
 
 # file modes
 kubernetes_executable_mode: "0775"
@@ -118,7 +120,6 @@ kubernetes_master_apiserver_count: "{{ groups['master'] | length }}"
 local_kubernetes_master_ip: https://127.0.0.1:{{ kubernetes_master_secure_port }}
 kubernetes_master_ip: https://{{ kubernetes_load_balanced_fqdn }}:{{ kubernetes_master_secure_port }}
 kubernetes_schedulable: "{% if 'worker' in group_names %}true{% else %}false{% endif %}"
-cluster_dns_replicas: "{{ [2, groups['worker'] | length] | min }}"
 # cloud provider
 cloud_config: "{% if cloud_config_local is defined and cloud_config_local != '' %}{{ kubernetes_install_dir }}/cloud-provider.conf{% else %}{% endif %}"
 
@@ -174,6 +175,7 @@ kubernetes_api_server_option_defaults:
   "etcd-keyfile": "{{ kubernetes_certificates.etcd_client_key }}"
   "etcd-servers": "{{ etcd_k8s_cluster_ip_list }}"
   "insecure-port": "0"
+  "kubelet-certificate-authority": "{{ kubernetes_certificates.ca }}"
   "kubelet-client-certificate": "{{ kubernetes_certificates.kube_apiserver_kubelet_client }}"
   "kubelet-client-key": "{{ kubernetes_certificates.kube_apiserver_kubelet_client_key }}"
   "kubelet-preferred-address-types": "{% if modify_hosts_file is defined and modify_hosts_file|bool == true %}InternalIP,ExternalIP,Hostname{% endif %}"
@@ -230,7 +232,6 @@ kubelet_defaults:
   "network-plugin": "{% if cni.enabled|bool == true %}cni{% endif %}"
   "docker": "unix:///var/run/docker.sock"
   "hostname-override": "{{ inventory_hostname }}"
-  "require-kubeconfig": "true"
   "kubeconfig": "{{ kubernetes_kubeconfig.kubelet }}"
   "node-labels": "{% if 'master' in group_names %},node-role.kubernetes.io/master={% endif %}"
   "node-ip": "{{ internal_ipv4 }}"

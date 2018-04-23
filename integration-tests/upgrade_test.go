@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 )
 
-var versions = []string{"v1.9.0"}
+var versions = []string{"v1.9.2"}
 
 var _ = Describe("Upgrade", func() {
 	Describe("Upgrading a cluster using online mode", func() {
@@ -267,6 +268,14 @@ func extractCurrentKismaticInstaller() {
 	FailIfError(err)
 }
 func upgradeCluster(online bool) {
+	// Remove old kubelet certificates
+	// TODO remove after 1.10 release
+	if err := deleteFiles("generated/keys/*-kubelet.pem"); err != nil {
+		FailIfError(err)
+	}
+	if err := deleteFiles("generated/keys/*-kubelet-key.pem"); err != nil {
+		FailIfError(err)
+	}
 	// Perform upgrade
 	cmd := exec.Command("./kismatic", "upgrade", "offline", defaultClusterName)
 	if online {
@@ -287,4 +296,17 @@ func upgradeCluster(online bool) {
 	}
 
 	assertClusterVersionIsCurrent()
+}
+
+func deleteFiles(regex string) error {
+	files, err := filepath.Glob(regex)
+	if err != nil {
+		return fmt.Errorf("error getting a list of files %q: %v", regex, err)
+	}
+	for _, f := range files {
+		if err := os.Remove(f); err != nil {
+			return fmt.Errorf("error deleting file %q: %v", f, err)
+		}
+	}
+	return nil
 }

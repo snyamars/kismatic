@@ -63,6 +63,11 @@
   * [CA](#docker_registryCA)
   * [username](#docker_registryusername)
   * [password](#docker_registrypassword)
+* [additional_files](#additional_files)
+  * [hosts](#additional_fileshosts)
+  * [source](#additional_filessource)
+  * [destination](#additional_filesdestination)
+  * [skip_validation](#additional_filesskip_validation)
 * [add_ons](#add_ons)
   * [cni](#add_onscni)
     * [disable](#add_onscnidisable)
@@ -74,9 +79,13 @@
         * [workload_mtu](#add_onscnioptionscalicoworkload_mtu)
         * [felix_input_mtu](#add_onscnioptionscalicofelix_input_mtu)
         * [ip_autodetection_method](#add_onscnioptionscalicoip_autodetection_method)
+      * [weave](#add_onscnioptionsweave)
+        * [password](#add_onscnioptionsweavepassword)
   * [dns](#add_onsdns)
     * [disable](#add_onsdnsdisable)
     * [provider](#add_onsdnsprovider)
+    * [options](#add_onsdnsoptions)
+      * [replicas](#add_onsdnsoptionsreplicas)
   * [heapster](#add_onsheapster)
     * [disable](#add_onsheapsterdisable)
     * [options](#add_onsheapsteroptions)
@@ -92,8 +101,12 @@
     * [disable](#add_onsmetrics_serverdisable)
   * [dashboard](#add_onsdashboard)
     * [disable](#add_onsdashboarddisable)
+    * [options](#add_onsdashboardoptions)
+      * [service_type](#add_onsdashboardoptionsservice_type)
   * [dashbard _(deprecated)_](#add_onsdashbard-deprecated)
     * [disable](#add_onsdashbarddisable)
+    * [options](#add_onsdashbardoptions)
+      * [service_type](#add_onsdashbardoptionsservice_type)
   * [package_manager](#add_onspackage_manager)
     * [disable](#add_onspackage_managerdisable)
     * [provider](#add_onspackage_managerprovider)
@@ -112,6 +125,10 @@
     * [ip](#etcdnodesip)
     * [internalip](#etcdnodesinternalip)
     * [labels](#etcdnodeslabels)
+    * [taints](#etcdnodestaints)
+      * [key](#etcdnodestaintskey)
+      * [value](#etcdnodestaintsvalue)
+      * [effect](#etcdnodestaintseffect)
     * [kubelet](#etcdnodeskubelet)
       * [option_overrides](#etcdnodeskubeletoption_overrides)
 * [master](#master)
@@ -123,6 +140,10 @@
     * [ip](#masternodesip)
     * [internalip](#masternodesinternalip)
     * [labels](#masternodeslabels)
+    * [taints](#masternodestaints)
+      * [key](#masternodestaintskey)
+      * [value](#masternodestaintsvalue)
+      * [effect](#masternodestaintseffect)
     * [kubelet](#masternodeskubelet)
       * [option_overrides](#masternodeskubeletoption_overrides)
 * [worker](#worker)
@@ -132,6 +153,10 @@
     * [ip](#workernodesip)
     * [internalip](#workernodesinternalip)
     * [labels](#workernodeslabels)
+    * [taints](#workernodestaints)
+      * [key](#workernodestaintskey)
+      * [value](#workernodestaintsvalue)
+      * [effect](#workernodestaintseffect)
     * [kubelet](#workernodeskubelet)
       * [option_overrides](#workernodeskubeletoption_overrides)
 * [ingress](#ingress)
@@ -141,6 +166,10 @@
     * [ip](#ingressnodesip)
     * [internalip](#ingressnodesinternalip)
     * [labels](#ingressnodeslabels)
+    * [taints](#ingressnodestaints)
+      * [key](#ingressnodestaintskey)
+      * [value](#ingressnodestaintsvalue)
+      * [effect](#ingressnodestaintseffect)
     * [kubelet](#ingressnodeskubelet)
       * [option_overrides](#ingressnodeskubeletoption_overrides)
 * [storage](#storage)
@@ -150,6 +179,10 @@
     * [ip](#storagenodesip)
     * [internalip](#storagenodesinternalip)
     * [labels](#storagenodeslabels)
+    * [taints](#storagenodestaints)
+      * [key](#storagenodestaintskey)
+      * [value](#storagenodestaintsvalue)
+      * [effect](#storagenodestaintseffect)
     * [kubelet](#storagenodeskubelet)
       * [option_overrides](#storagenodeskubeletoption_overrides)
 * [nfs](#nfs)
@@ -202,7 +235,7 @@
 |----------|-----------------|
 | **Kind** |  string |
 | **Required** |  No |
-| **Default** | `v1.9.3` | 
+| **Default** | `v1.10.1` | 
 
 ###  cluster.admin_password _(deprecated)_
 
@@ -686,6 +719,44 @@
 | **Required** |  No |
 | **Default** | ` ` | 
 
+##  additional_files
+
+ A set of files or directories to copy from the local machine to any of the nodes in the cluster. 
+
+###  additional_files.hosts
+
+ Hostname or role where additional files or directories will be copied. 
+
+###  additional_files.source
+
+ Path to the file or directory on local machine. Must be an absolute path. 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  Yes |
+| **Default** | ` ` | 
+
+###  additional_files.destination
+
+ Path to the file or directory on remote machine, where file will be copied. Must be an absolute path. 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  Yes |
+| **Default** | ` ` | 
+
+###  additional_files.skip_validation
+
+ Set to true if validation will be run before the file exists on the local machine. Useful for files generated at install time, ie. assets in generated/ directory. 
+
+| | |
+|----------|-----------------|
+| **Kind** |  bool |
+| **Required** |  No |
+| **Default** | `false` | 
+
 ##  add_ons
 
  Add on configuration 
@@ -775,6 +846,20 @@
 | **Required** |  No |
 | **Default** | `first-found` | 
 
+###  add_ons.cni.options.weave
+
+ The options that can be configured for the Weave CNI provider. 
+
+###  add_ons.cni.options.weave.password
+
+ The password to use for network traffic encryption. 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
 ###  add_ons.dns
 
  The DNS add-on configuration. 
@@ -799,6 +884,20 @@
 | **Required** |  Yes |
 | **Default** | `kubedns` | 
 | **Options** |  `kubedns`, `coredns`
+
+###  add_ons.dns.options
+
+ The options that can be configured for the cluster DNS add-on 
+
+###  add_ons.dns.options.replicas
+
+ Number of cluster DNS replicas that should be scheduled on the cluster. 
+
+| | |
+|----------|-----------------|
+| **Kind** |  int |
+| **Required** |  No |
+| **Default** | `2` | 
 
 ###  add_ons.heapster
 
@@ -915,6 +1014,21 @@
 | **Required** |  No |
 | **Default** | `false` | 
 
+###  add_ons.dashboard.options
+
+ The options that can be configured for the Dashboard add-on 
+
+###  add_ons.dashboard.options.service_type
+
+ Kubernetes service type of the Dashboard service. 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | `ClusterIP` | 
+| **Options** |  `ClusterIP`, `NodePort`, `LoadBalancer`, `ExternalName`
+
 ###  add_ons.dashbard _(deprecated)_
 
  The Dashboard add-on configuration. 
@@ -928,6 +1042,21 @@
 | **Kind** |  bool |
 | **Required** |  No |
 | **Default** | `false` | 
+
+###  add_ons.dashbard.options
+
+ The options that can be configured for the Dashboard add-on 
+
+###  add_ons.dashbard.options.service_type
+
+ Kubernetes service type of the Dashboard service. 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | `ClusterIP` | 
+| **Options** |  `ClusterIP`, `NodePort`, `LoadBalancer`, `ExternalName`
 
 ###  add_ons.package_manager
 
@@ -1062,6 +1191,41 @@
 | **Required** |  No |
 | **Default** | ` ` | 
 
+###  etcd.nodes.taints
+
+ Taints to add when installing the node in the cluster. If a node is defined under multiple roles, the taints for that node will be merged. If a taint is repeated for the same node, only one will be used in this order: etcd,master,worker,ingress,storage roles where 'storage' has the highest precedence. 
+
+###  etcd.nodes.taints.key
+
+ Key for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  etcd.nodes.taints.value
+
+ Value for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  etcd.nodes.taints.effect
+
+ Effect for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+| **Options** |  `NoSchedule`, `PreferNoSchedule`, `NoExecute`
+
 ###  etcd.nodes.kubelet
 
  Kubelet configuration applied to this node. If a node is repeated for multiple roles, the overrides cannot be different. 
@@ -1154,6 +1318,41 @@
 | **Required** |  No |
 | **Default** | ` ` | 
 
+###  master.nodes.taints
+
+ Taints to add when installing the node in the cluster. If a node is defined under multiple roles, the taints for that node will be merged. If a taint is repeated for the same node, only one will be used in this order: etcd,master,worker,ingress,storage roles where 'storage' has the highest precedence. 
+
+###  master.nodes.taints.key
+
+ Key for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  master.nodes.taints.value
+
+ Value for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  master.nodes.taints.effect
+
+ Effect for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+| **Options** |  `NoSchedule`, `PreferNoSchedule`, `NoExecute`
+
 ###  master.nodes.kubelet
 
  Kubelet configuration applied to this node. If a node is repeated for multiple roles, the overrides cannot be different. 
@@ -1225,6 +1424,41 @@
 | **Kind** |  map[string]string |
 | **Required** |  No |
 | **Default** | ` ` | 
+
+###  worker.nodes.taints
+
+ Taints to add when installing the node in the cluster. If a node is defined under multiple roles, the taints for that node will be merged. If a taint is repeated for the same node, only one will be used in this order: etcd,master,worker,ingress,storage roles where 'storage' has the highest precedence. 
+
+###  worker.nodes.taints.key
+
+ Key for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  worker.nodes.taints.value
+
+ Value for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  worker.nodes.taints.effect
+
+ Effect for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+| **Options** |  `NoSchedule`, `PreferNoSchedule`, `NoExecute`
 
 ###  worker.nodes.kubelet
 
@@ -1298,6 +1532,41 @@
 | **Required** |  No |
 | **Default** | ` ` | 
 
+###  ingress.nodes.taints
+
+ Taints to add when installing the node in the cluster. If a node is defined under multiple roles, the taints for that node will be merged. If a taint is repeated for the same node, only one will be used in this order: etcd,master,worker,ingress,storage roles where 'storage' has the highest precedence. 
+
+###  ingress.nodes.taints.key
+
+ Key for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  ingress.nodes.taints.value
+
+ Value for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  ingress.nodes.taints.effect
+
+ Effect for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+| **Options** |  `NoSchedule`, `PreferNoSchedule`, `NoExecute`
+
 ###  ingress.nodes.kubelet
 
  Kubelet configuration applied to this node. If a node is repeated for multiple roles, the overrides cannot be different. 
@@ -1369,6 +1638,41 @@
 | **Kind** |  map[string]string |
 | **Required** |  No |
 | **Default** | ` ` | 
+
+###  storage.nodes.taints
+
+ Taints to add when installing the node in the cluster. If a node is defined under multiple roles, the taints for that node will be merged. If a taint is repeated for the same node, only one will be used in this order: etcd,master,worker,ingress,storage roles where 'storage' has the highest precedence. 
+
+###  storage.nodes.taints.key
+
+ Key for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  storage.nodes.taints.value
+
+ Value for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
+###  storage.nodes.taints.effect
+
+ Effect for the taint 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | ` ` | 
+| **Options** |  `NoSchedule`, `PreferNoSchedule`, `NoExecute`
 
 ###  storage.nodes.kubelet
 

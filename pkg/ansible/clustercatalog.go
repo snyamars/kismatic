@@ -31,6 +31,8 @@ type ClusterCatalog struct {
 	KubeProxyOptions             map[string]string `yaml:"kube_proxy_option_overrides"`
 	KubeletOptions               map[string]string `yaml:"kubelet_overrides"`
 
+	AdditionalFiles []AdditionalFile `yaml:"additional_files"`
+
 	ConfigureDockerWithPrivateRegistry bool   `yaml:"configure_docker_with_private_registry"`
 	DockerRegistryCAPath               string `yaml:"docker_certificates_ca_path"`
 	DockerRegistryServer               string `yaml:"docker_registry_full_url"`
@@ -97,6 +99,9 @@ type ClusterCatalog struct {
 	DNS struct {
 		Enabled  bool
 		Provider string
+		Options  struct {
+			Replicas int
+		}
 	}
 
 	RunPodValidation bool `yaml:"run_pod_validation"`
@@ -111,6 +116,9 @@ type ClusterCatalog struct {
 				WorkloadMTU           int    `yaml:"workload_mtu"`
 				FelixInputMTU         int    `yaml:"felix_input_mtu"`
 				IPAutodetectionMethod string `yaml:"ip_autodetection_method"`
+			}
+			Weave struct {
+				Password string
 			}
 		}
 	}
@@ -135,6 +143,9 @@ type ClusterCatalog struct {
 
 	Dashboard struct {
 		Enabled bool
+		Options struct {
+			ServiceType string `yaml:"service_type"`
+		}
 	}
 
 	Helm struct {
@@ -153,6 +164,7 @@ type ClusterCatalog struct {
 	NoProxy    string `yaml:"no_proxy"`
 
 	NodeLabels         map[string][]string          `yaml:"node_labels"`
+	NodeTaints         map[string][]string          `yaml:"node_taints"`
 	KubeletNodeOptions map[string]map[string]string `yaml:"kubelet_node_overrides"`
 }
 
@@ -166,6 +178,12 @@ type DirectLVMBlockDevice struct {
 type NFSVolume struct {
 	Host string
 	Path string
+}
+
+type AdditionalFile struct {
+	Source      string
+	Destination string
+	Hosts       []string
 }
 
 func (c *ClusterCatalog) EnableRestart() {

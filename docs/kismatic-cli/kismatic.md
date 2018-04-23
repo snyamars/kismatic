@@ -32,6 +32,7 @@ kismatic [flags]
 * [kismatic plan](kismatic_plan.md)	 - plan your Kubernetes cluster and generate a plan file
 * [kismatic provision](kismatic_provision.md)	 - provision your Kubernetes cluster
 * [kismatic remove](kismatic_remove.md)	 - removes all references to a cluster from the database and filesystem
+* [kismatic reset](kismatic_reset.md)	 - reset any changes made to the hosts by 'apply'
 * [kismatic seed-registry](kismatic_seed-registry.md)	 - seed a registry with the container images required by KET
 * [kismatic server](kismatic_server.md)	 - server starts an HTTP server
 * [kismatic ssh](kismatic_ssh.md)	 - ssh into a node in the cluster

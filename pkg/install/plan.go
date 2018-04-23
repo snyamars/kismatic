@@ -33,7 +33,7 @@ type PlanTemplateOptions struct {
 	WorkerNodes               int
 	IngressNodes              int
 	StorageNodes              int
-	NFSVolumes                int
+	AdditionalFiles           int
 	AdminPassword             string
 }
 
@@ -207,6 +207,9 @@ func setDefaults(p *Plan) {
 	if p.AddOns.DNS.Provider == "" {
 		p.AddOns.DNS.Provider = "kubedns"
 	}
+	if p.AddOns.DNS.Options.Replicas <= 0 {
+		p.AddOns.DNS.Options.Replicas = 2
+	}
 
 	if p.AddOns.HeapsterMonitoring == nil {
 		p.AddOns.HeapsterMonitoring = &HeapsterMonitoring{}
@@ -236,12 +239,16 @@ func setDefaults(p *Plan) {
 		p.AddOns.Dashboard = &Dashboard{}
 	}
 
+	if p.AddOns.Dashboard.Options.ServiceType == "" {
+		p.AddOns.Dashboard.Options.ServiceType = "ClusterIP"
+	}
+
 	if p.AddOns.PackageManager.Options.Helm.Namespace == "" {
 		p.AddOns.PackageManager.Options.Helm.Namespace = "kube-system"
 	}
 }
 
-var yamlKeyRE = regexp.MustCompile(`[^a-zA-Z]*([a-z_\-A-Z.\d]+)[ ]*:`)
+var yamlKeyRE = regexp.MustCompile(`[^a-zA-Z]*([a-z_\-\/A-Z.\d]+)[ ]*:`)
 
 // Write the plan to the file system
 func (fp *FilePlanner) Write(p *Plan) error {
@@ -286,7 +293,10 @@ func (fp *FilePlanner) Write(p *Plan) error {
 			if etcdBlock && strings.Contains(text, "labels: {}") {
 				continue
 			}
-
+			// Don't print taints: [] for etcd group
+			if etcdBlock && strings.Contains(text, "taints: []") {
+				continue
+			}
 			// Add a new line if we are leaving a major indentation block
 			// (leaving a struct)..
 			if indent < prevIndent {
@@ -435,7 +445,7 @@ func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 
 	// DNS
 	p.AddOns.DNS.Provider = "kubedns"
-
+	p.AddOns.DNS.Options.Replicas = 2
 	// Heapster
 	p.AddOns.HeapsterMonitoring = &HeapsterMonitoring{}
 	p.AddOns.HeapsterMonitoring.Options.Heapster.Replicas = 2
@@ -448,6 +458,7 @@ func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 
 	p.AddOns.Dashboard = &Dashboard{}
 	p.AddOns.Dashboard.Disable = false
+	p.AddOns.Dashboard.Options.ServiceType = "ClusterIP"
 
 	// Generate entries for all node types
 	p.Etcd.ExpectedCount = templateOpts.EtcdNodes
@@ -456,9 +467,9 @@ func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 	p.Ingress.ExpectedCount = templateOpts.IngressNodes
 	p.Storage.ExpectedCount = templateOpts.StorageNodes
 
-	for i := 0; i < templateOpts.NFSVolumes; i++ {
-		v := NFSVolume{Host: "", Path: "/"}
-		p.NFS.Volumes = append(p.NFS.Volumes, v)
+	for i := 0; i < templateOpts.AdditionalFiles; i++ {
+		f := AdditionalFile{}
+		p.AdditionalFiles = append(p.AdditionalFiles, f)
 	}
 
 	n := Node{}
@@ -547,6 +558,7 @@ var commentMap = map[string][]string{
 	"add_ons.cni.options.calico.workload_mtu":            []string{"MTU for the workload interface, configures the CNI config."},
 	"add_ons.cni.options.calico.felix_input_mtu":         []string{"MTU for the tunnel device used if IPIP is enabled."},
 	"add_ons.cni.options.calico.ip_autodetection_method": []string{"Used to detect the IPv4 address of the host."},
+	"add_ons.cni.options.weave.password":                 []string{"Used by Weave for network traffic encryption.", "Should be reasonably strong, with at least 50 bits of entropy."},
 	"add_ons.dns.provider":                               []string{"Options: 'kubedns','coredns'."},
 	"add_ons.heapster.options.influxdb.pvc_name":         []string{"Provide the name of the persistent volume claim that you will create", "after installation. If not specified, the data will be stored in", "ephemeral storage."},
 	"add_ons.heapster.options.heapster.service_type":     []string{"Specify kubernetes ServiceType. Defaults to 'ClusterIP'.", "Options: 'ClusterIP','NodePort','LoadBalancer','ExternalName'."},
@@ -562,9 +574,7 @@ var commentMap = map[string][]string{
 	"storage":                                            []string{"Storage nodes will be used to create a distributed storage cluster that can", "be consumed by your workloads."},
 	"master.load_balanced_fqdn":                          []string{"If you have set up load balancing for master nodes, enter the FQDN name here.", "Otherwise, use the IP address of a single master node."},
 	"master.load_balanced_short_name":                    []string{"If you have set up load balancing for master nodes, enter the short name here.", "Otherwise, use the IP address of a single master node."},
-	"nfs":            []string{"A set of NFS volumes for use by on-cluster persistent workloads."},
-	"nfs.nfs_host":   []string{"The host name or ip address of an NFS server."},
-	"nfs.mount_path": []string{"The mount path of an NFS share. Must start with '/'."},
+	"additional_files":                                   []string{"A set of files or directories to copy from the local machine to any of the nodes in the cluster."},
 }
 
 type stack struct {

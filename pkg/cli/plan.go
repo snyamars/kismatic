@@ -119,12 +119,12 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 		return nil, fmt.Errorf("The number of storage nodes must be greater than or equal to zero")
 	}
 
-	nfsVolumes, err := util.PromptForInt(in, out, "Number of existing NFS volumes to be attached", 0)
+	files, err := util.PromptForInt(in, out, "Number of existing files or directories to be copied", 0)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading number of nfs volumes: %v", err)
+		return nil, fmt.Errorf("Error reading number of files or directories: %v", err)
 	}
-	if nfsVolumes < 0 {
-		return nil, fmt.Errorf("The number of nfs volumes must be greater than or equal to zero")
+	if files < 0 {
+		return nil, fmt.Errorf("The number of files or directories must be greater than or equal to zero")
 	}
 
 	fmt.Fprintln(out)
@@ -140,7 +140,7 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 	fmt.Fprintf(out, "- %d worker nodes\n", workerNodes)
 	fmt.Fprintf(out, "- %d ingress nodes\n", ingressNodes)
 	fmt.Fprintf(out, "- %d storage nodes\n", storageNodes)
-	fmt.Fprintf(out, "- %d nfs volumes\n", nfsVolumes)
+	fmt.Fprintf(out, "- %d files\n", files)
 	fmt.Fprintln(out)
 
 	// If we are using KET to provision infrastructure, use the template file
@@ -159,6 +159,10 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 		planTemplate.Worker.ExpectedCount = workerNodes
 		planTemplate.Ingress.ExpectedCount = ingressNodes
 		planTemplate.Storage.ExpectedCount = storageNodes
+		for i := 0; i < files; i++ {
+			f := install.AdditionalFile{}
+			planTemplate.AdditionalFiles = append(planTemplate.AdditionalFiles, f)
+		}
 
 		if err := planner.Write(planTemplate); err != nil {
 			return nil, fmt.Errorf("error planning installation: %v", err)
@@ -172,7 +176,7 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 			WorkerNodes:               workerNodes,
 			IngressNodes:              ingressNodes,
 			StorageNodes:              storageNodes,
-			NFSVolumes:                nfsVolumes,
+			AdditionalFiles:           files,
 		}
 		if err = install.WritePlanTemplate(planTemplate, &planner); err != nil {
 			return nil, fmt.Errorf("error planning installation: %v", err)

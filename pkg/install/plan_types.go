@@ -56,6 +56,14 @@ func cloudProviders() []string {
 	return []string{"aws", "azure", "cloudstack", "fake", "gce", "mesos", "openstack", "ovirt", "photon", "rackspace", "vsphere"}
 }
 
+func roles() []string {
+	return []string{"etcd", "master", "worker", "ingress", "storage"}
+}
+
+func taintEffects() []string {
+	return []string{"NoSchedule", "PreferNoSchedule", "NoExecute"}
+}
+
 // Plan is the installation plan that the user intends to execute
 type Plan struct {
 	// Infrastructure provisioner
@@ -67,6 +75,8 @@ type Plan struct {
 	Docker Docker
 	// Docker registry configuration
 	DockerRegistry DockerRegistry `yaml:"docker_registry"`
+	// A set of files or directories to copy from the local machine to any of the nodes in the cluster.
+	AdditionalFiles []AdditionalFile `yaml:"additional_files"`
 	// Add on configuration
 	AddOns AddOns `yaml:"add_ons"`
 	// Feature configuration
@@ -86,7 +96,7 @@ type Plan struct {
 	// Storage nodes of the cluster.
 	Storage OptionalNodeGroup
 	// NFS volumes of the cluster.
-	NFS NFS
+	NFS *NFS `yaml:"nfs,omitempty"`
 }
 
 func (p Plan) Equal(op Plan) bool {
@@ -111,7 +121,7 @@ type Cluster struct {
 	// The Kubernetes version to install.
 	// If left blank will be set to the latest tested version.
 	// Only a single Minor version is supported with.
-	// +default=v1.9.3
+	// +default=v1.10.1
 	Version string
 	// The password for the admin user.
 	// If provided, ABAC will be enabled in the cluster.
@@ -317,6 +327,24 @@ type DockerStorageDirectLVMDeprecated struct {
 	EnableDeferredDeletion bool `yaml:"enable_deferred_deletion"`
 }
 
+// AdditionalFile is a file or directory to copy to remote host(s) from the local host
+type AdditionalFile struct {
+	// Hostname or role where additional files or directories will be copied.
+	// +required
+	Hosts []string
+	// Path to the file or directory on local machine.
+	// Must be an absolute path.
+	// +required
+	Source string
+	// Path to the file or directory on remote machine, where file will be copied.
+	// Must be an absolute path.
+	// +required
+	Destination string
+	// Set to true if validation will be run before the file exists on the local machine.
+	// Useful for files generated at install time, ie. assets in generated/ directory.
+	SkipValidation bool `yaml:"skip_validation"`
+}
+
 // DockerRegistry details for docker registry, either confgiured by the cli or customer provided
 type DockerRegistry struct {
 	// The hostname or IP address and port of a private container image registry.
@@ -397,7 +425,9 @@ type CNI struct {
 // CNIOptions that can be configured for each CNI provider.
 type CNIOptions struct {
 	// The options that can be configured for the Calico CNI provider.
-	Calico CalicoOptions `yaml:"calico,omitempty"`
+	Calico CalicoOptions
+	// The options that can be configured for the Weave CNI provider.
+	Weave WeaveOptions
 }
 
 // The CalicoOptions that can be configured for the Calico CNI provider.
@@ -422,6 +452,12 @@ type CalicoOptions struct {
 	IPAutodetectionMethod string `yaml:"ip_autodetection_method"`
 }
 
+// The WeaveOptions that can be configured for the Weave CNI provider.
+type WeaveOptions struct {
+	// The password to use for network traffic encryption.
+	Password string
+}
+
 // The DNS add-on configuration
 type DNS struct {
 	// Whether the DNS add-on should be disabled.
@@ -432,6 +468,14 @@ type DNS struct {
 	// +options=kubedns,coredns
 	// +default=kubedns
 	Provider string
+	// The options that can be configured for the cluster DNS add-on
+	Options DNSOptions
+}
+
+type DNSOptions struct {
+	// Number of cluster DNS replicas that should be scheduled on the cluster.
+	// +default=2
+	Replicas int
 }
 
 // The HeapsterMonitoring add-on configuration
@@ -496,6 +540,16 @@ type Dashboard struct {
 	// When set to true, the Kubernetes Dashboard will not be installed on the cluster.
 	// +default=false
 	Disable bool
+	// The options that can be configured for the Dashboard add-on
+	Options DashboardOptions
+}
+
+// The DashboardOptions for the Dashboard addon
+type DashboardOptions struct {
+	// Kubernetes service type of the Dashboard service.
+	// +default=ClusterIP
+	// +options=ClusterIP,NodePort,LoadBalancer,ExternalName
+	ServiceType string `yaml:"service_type"`
 }
 
 // PackageManager add-on configuration
@@ -589,9 +643,26 @@ type Node struct {
 	// only one will be used in this order: etcd,master,worker,ingress,storage roles where 'storage' has the highest precedence.
 	// It is recommended to use reverse-DNS notation to avoid collision with other labels.
 	Labels map[string]string
+	// Taints to add when installing the node in the cluster.
+	// If a node is defined under multiple roles, the taints for that node will be merged.
+	// If a taint is repeated for the same node,
+	// only one will be used in this order: etcd,master,worker,ingress,storage roles where 'storage' has the highest precedence.
+	Taints []Taint
 	// Kubelet configuration applied to this node.
 	// If a node is repeated for multiple roles, the overrides cannot be different.
 	KubeletOptions KubeletOptions `yaml:"kubelet,omitempty"`
+}
+
+// Equal returns true of 2 nodes have the same HashCode
+// Taint for nodes
+type Taint struct {
+	// Key for the taint
+	Key string
+	// Value for the taint
+	Value string
+	// Effect for the taint
+	// +options=NoSchedule,PreferNoSchedule,NoExecute
+	Effect string
 }
 
 // mapMerge merges two map[string]strings. If both maps have some identical key, the value from the first map provided will be used.
@@ -648,7 +719,7 @@ Outer:
 	return ret
 }
 
-// Equal returns true of 2 nodes have the same HashCode
+// Equal returns true of 2 nodes have the same host, IP and InternalIP
 func (node Node) Equal(other Node) bool {
 	return node.HashCode() == other.HashCode()
 }
@@ -656,6 +727,18 @@ func (node Node) Equal(other Node) bool {
 // HashCode is crude implementation for the Node struct
 func (node Node) HashCode() string {
 	return fmt.Sprint(node.Host, node.IP, node.InternalIP)
+}
+
+// KubeletAddresses returns the host and the internalIP
+// If no internalIP is provided, IP will be be returned instead
+func (node Node) KubeletAddresses() []string {
+	addr := []string{node.Host}
+	if node.InternalIP != "" {
+		addr = append(addr, node.InternalIP)
+	} else {
+		addr = append(addr, node.IP)
+	}
+	return addr
 }
 
 type NFS struct {
@@ -742,7 +825,7 @@ func (p *Plan) getNodeWithIP(ip string) (*Node, error) {
 }
 
 // AllAddresses will return the hostnames, IPs and internal IPs for all nodes
-func (p *Plan) AllAddresses() string {
+func (p *Plan) AllAddresses() []string {
 	nodes := p.GetUniqueNodes()
 	var addr []string
 	for _, n := range nodes {
@@ -752,7 +835,25 @@ func (p *Plan) AllAddresses() string {
 			addr = append(addr, n.InternalIP)
 		}
 	}
-	return strings.Join(addr, ",")
+	return addr
+}
+
+func (p *Plan) ValidRole(role string) bool {
+	for _, r := range roles() {
+		if r == role {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *Plan) HostExists(host string) bool {
+	for _, n := range p.GetUniqueNodes() {
+		if host == n.Host {
+			return true
+		}
+	}
+	return false
 }
 
 // GetSSHConnection returns the SSHConnection struct containing the node and SSHConfig details
@@ -955,11 +1056,12 @@ func (node Node) certSpecs(plan Plan, ca *tls.CA) ([]certificateSpec, error) {
 	// Kubelet and etcd client certificate
 	if containsAny([]string{"master", "worker", "ingress", "storage"}, roles) {
 		m = append(m, certificateSpec{
-			description:   fmt.Sprintf("%s kubelet", node.Host),
-			filename:      fmt.Sprintf("%s-kubelet", node.Host),
-			commonName:    fmt.Sprintf("%s:%s", kubeletUserPrefix, strings.ToLower(node.Host)),
-			organizations: []string{kubeletGroup},
-			ca:            ca,
+			description:           fmt.Sprintf("%s kubelet", node.Host),
+			filename:              fmt.Sprintf("%s-kubelet", node.Host),
+			commonName:            fmt.Sprintf("%s:%s", kubeletUserPrefix, strings.ToLower(node.Host)),
+			subjectAlternateNames: node.KubeletAddresses(),
+			organizations:         []string{kubeletGroup},
+			ca:                    ca,
 		})
 
 		// etcd client certificate

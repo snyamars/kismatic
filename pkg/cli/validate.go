@@ -18,6 +18,7 @@ type validateOpts struct {
 	verbose            bool
 	outputFormat       string
 	skipPreFlight      bool
+	limit              []string
 }
 
 // NewCmdValidate creates a new validate command
@@ -43,6 +44,7 @@ func NewCmdValidate(out io.Writer) *cobra.Command {
 			return doValidate(out, planner, opts)
 		},
 	}
+	cmd.Flags().StringSliceVar(&opts.limit, "limit", []string{}, "comma-separated list of hostnames to limit the execution to a subset of nodes")
 	cmd.Flags().BoolVar(&opts.verbose, "verbose", false, "enable verbose logging from the installation")
 	cmd.Flags().StringVarP(&opts.outputFormat, "output", "o", "simple", "installation output format (options simple|raw)")
 	cmd.Flags().BoolVar(&opts.skipPreFlight, "skip-preflight", false, "skip pre-flight checks")
@@ -61,6 +63,11 @@ func doValidate(out io.Writer, planner install.Planner, opts *validateOpts) erro
 	if err != nil {
 		util.PrettyPrintErr(out, "Reading installation plan file %q", opts.planFile)
 		return fmt.Errorf("error reading plan file: %v", err)
+	}
+	for _, host := range opts.limit {
+		if !plan.HostExists(host) {
+			return fmt.Errorf("host %q in '--limit' option does not match any hosts in the plan file", host)
+		}
 	}
 	util.PrettyPrintOk(out, "Reading installation plan file %q", opts.planFile)
 
@@ -99,7 +106,7 @@ func doValidate(out io.Writer, planner install.Planner, opts *validateOpts) erro
 	if err != nil {
 		return err
 	}
-	return e.RunPreFlightCheck(plan)
+	return e.RunPreFlightCheck(plan, opts.limit...)
 }
 
 // TODO this should really not be here

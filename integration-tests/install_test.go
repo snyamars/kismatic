@@ -45,7 +45,6 @@ var _ = Describe("kismatic", func() {
 				Expect(helpText).To(ContainSubstring("3 worker nodes"))
 				Expect(helpText).To(ContainSubstring("2 ingress nodes"))
 				Expect(helpText).To(ContainSubstring("0 storage nodes"))
-				Expect(helpText).To(ContainSubstring("0 nfs volumes"))
 				file := clusterPath
 				Expect(FileExists(file)).To(Equal(true))
 
@@ -67,7 +66,6 @@ var _ = Describe("kismatic", func() {
 				Expect(planFromYaml.Worker.ExpectedCount).To(Equal(3))
 				Expect(planFromYaml.Ingress.ExpectedCount).To(Equal(2))
 				Expect(planFromYaml.Storage.ExpectedCount).To(Equal(0))
-				Expect(len(planFromYaml.NFS.Volumes)).To(Equal(0))
 			})
 		})
 	})
@@ -150,6 +148,8 @@ var _ = Describe("kismatic", func() {
 					// Ensure preflight checks are idempotent on CentOS7
 					err = runValidate(clusterPath)
 					Expect(err).ToNot(HaveOccurred())
+					err = resetKismaticMini(node, sshKey)
+					Expect(err).ToNot(HaveOccurred())
 				})
 			})
 		})
@@ -162,6 +162,8 @@ var _ = Describe("kismatic", func() {
 					// Ensure preflight checks are idempotent on RedHat7
 					err = runValidate(clusterPath)
 					Expect(err).ToNot(HaveOccurred())
+					err = resetKismaticMini(node, sshKey)
+					Expect(err).ToNot(HaveOccurred())
 				})
 			})
 		})
@@ -173,6 +175,8 @@ var _ = Describe("kismatic", func() {
 					Expect(err).ToNot(HaveOccurred())
 					// Ensure preflight checks are idempotent on Ubuntu 1604
 					err = runValidate(clusterPath)
+					Expect(err).ToNot(HaveOccurred())
+					err = resetKismaticMini(node, sshKey)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})
@@ -238,7 +242,7 @@ var _ = Describe("kismatic", func() {
 
 		Context("when deploying an HA cluster", func() {
 			ItOnAWS("should still be a highly available cluster after removing a master node [slow]", func(aws infrastructureProvisioner) {
-				WithInfrastructureAndDNS(NodeCount{1, 2, 1, 0, 0}, Ubuntu1604LTS, aws, func(nodes provisionedNodes, sshKey string) {
+				WithInfrastructureAndDNS(NodeCount{1, 2, 1, 1, 0}, Ubuntu1604LTS, aws, func(nodes provisionedNodes, sshKey string) {
 					// install cluster
 					installOpts := installOptions{}
 					err := installKismatic(nodes, installOpts, sshKey)

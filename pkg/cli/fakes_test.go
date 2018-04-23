@@ -43,12 +43,16 @@ func (fe *fakeExecutor) GenerateKubeconfig(plan install.Plan) error {
 	return nil
 }
 
-func (fe *fakeExecutor) Install(p *install.Plan, restartServices bool) error {
+func (fe *fakeExecutor) Install(p *install.Plan, restartServices bool, nodes ...string) error {
 	fe.installCalled = true
 	return fe.err
 }
 
-func (fe *fakeExecutor) RunPreFlightCheck(p *install.Plan) error {
+func (fe *fakeExecutor) Reset(p *install.Plan, nodes ...string) error {
+	return nil
+}
+
+func (fe *fakeExecutor) RunPreFlightCheck(p *install.Plan, nodes ...string) error {
 	return nil
 }
 
@@ -80,7 +84,7 @@ func (fe *fakeExecutor) RunSmokeTest(p *install.Plan) error {
 	return nil
 }
 
-func (fe *fakeExecutor) RunPlay(string, *install.Plan, bool) error {
+func (fe *fakeExecutor) RunPlay(string, *install.Plan, bool, ...string) error {
 	return nil
 }
 

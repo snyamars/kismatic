@@ -20,7 +20,7 @@ import (
 // The PreFlightExecutor will run pre-flight checks against the
 // environment defined in the plan file
 type PreFlightExecutor interface {
-	RunPreFlightCheck(*Plan) error
+	RunPreFlightCheck(plan *Plan, nodes ...string) error
 	RunNewNodePreFlightCheck(Plan, Node) error
 	RunUpgradePreFlightCheck(*Plan, ListableNode) error
 }
@@ -28,12 +28,13 @@ type PreFlightExecutor interface {
 // The Executor will carry out the installation plan
 type Executor interface {
 	PreFlightExecutor
-	Install(plan *Plan, restartServices bool) error
+	Install(plan *Plan, restartServices bool, nodes ...string) error
+	Reset(plan *Plan, nodes ...string) error
 	GenerateCertificates(p *Plan, useExistingCA bool) error
 	GenerateKubeconfig(p Plan) error
 	RunSmokeTest(*Plan) error
-	AddNode(Plan *Plan, node Node, roles []string, restartServices bool) (*Plan, error)
-	RunPlay(name string, plan *Plan, restartServices bool) error
+	AddNode(plan *Plan, node Node, roles []string, restartServices bool) (*Plan, error)
+	RunPlay(name string, plan *Plan, restartServices bool, nodes ...string) error
 	AddVolume(*Plan, StorageVolume) error
 	DeleteVolume(*Plan, string) error
 	UpgradeNodes(plan Plan, nodesToUpgrade []ListableNode, onlineUpgrade bool, maxParallelWorkers int, restartServices bool) error
@@ -284,7 +285,7 @@ func (ae *ansibleExecutor) GenerateKubeconfig(p Plan) error {
 }
 
 // Install the cluster according to the installation plan
-func (ae *ansibleExecutor) Install(p *Plan, restartServices bool) error {
+func (ae *ansibleExecutor) Install(p *Plan, restartServices bool, nodes ...string) error {
 	// Build the ansible inventory
 	cc, err := ae.buildClusterCatalog(p)
 	if err != nil {
@@ -300,8 +301,27 @@ func (ae *ansibleExecutor) Install(p *Plan, restartServices bool) error {
 		inventory:      buildInventoryFromPlan(p),
 		clusterCatalog: *cc,
 		explainer:      ae.defaultExplainer(),
+		limit:          nodes,
 	}
 	util.PrintHeader(ae.stdout, "Installing Cluster", '=')
+	return ae.execute(t)
+}
+
+func (ae *ansibleExecutor) Reset(p *Plan, nodes ...string) error {
+	cc, err := ae.buildClusterCatalog(p)
+	if err != nil {
+		return err
+	}
+	t := task{
+		name:           "reset",
+		playbook:       "reset.yaml",
+		explainer:      ae.defaultExplainer(),
+		plan:           *p,
+		inventory:      buildInventoryFromPlan(p),
+		clusterCatalog: *cc,
+		limit:          nodes,
+	}
+	util.PrintHeader(ae.stdout, "Resetting Nodes in the Cluster", '=')
 	return ae.execute(t)
 }
 
@@ -323,7 +343,7 @@ func (ae *ansibleExecutor) RunSmokeTest(p *Plan) error {
 }
 
 // RunPreflightCheck against the nodes defined in the plan
-func (ae *ansibleExecutor) RunPreFlightCheck(p *Plan) error {
+func (ae *ansibleExecutor) RunPreFlightCheck(p *Plan, nodes ...string) error {
 	cc, err := ae.buildClusterCatalog(p)
 	if err != nil {
 		return err
@@ -335,6 +355,7 @@ func (ae *ansibleExecutor) RunPreFlightCheck(p *Plan) error {
 		clusterCatalog: *cc,
 		explainer:      ae.preflightExplainer(),
 		plan:           *p,
+		limit:          nodes,
 	}
 	return ae.execute(t)
 }
@@ -400,7 +421,7 @@ func (ae *ansibleExecutor) RunUpgradePreFlightCheck(p *Plan, node ListableNode) 
 	return ae.execute(t)
 }
 
-func (ae *ansibleExecutor) RunPlay(playName string, p *Plan, restartServices bool) error {
+func (ae *ansibleExecutor) RunPlay(playName string, p *Plan, restartServices bool, nodes ...string) error {
 	cc, err := ae.buildClusterCatalog(p)
 	if err != nil {
 		return err
@@ -415,6 +436,7 @@ func (ae *ansibleExecutor) RunPlay(playName string, p *Plan, restartServices boo
 		clusterCatalog: *cc,
 		explainer:      ae.defaultExplainer(),
 		plan:           *p,
+		limit:          nodes,
 	}
 	return ae.execute(t)
 }
@@ -689,7 +711,7 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 	cc.Versions.KubernetesYum = p.Cluster.Version[1:] + "-0"
 	cc.Versions.KubernetesDeb = p.Cluster.Version[1:] + "-00"
 
-	cc.NoProxy = p.AllAddresses()
+	cc.NoProxy = strings.Join(p.AllAddresses(), ",")
 	if p.Cluster.Networking.NoProxy != "" {
 		cc.NoProxy = cc.NoProxy + "," + p.Cluster.Networking.NoProxy
 	}
@@ -742,11 +764,13 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 		cc.EnableConfigureIngress = false
 	}
 
-	for _, n := range p.NFS.Volumes {
-		cc.NFSVolumes = append(cc.NFSVolumes, ansible.NFSVolume{
-			Path: n.Path,
-			Host: n.Host,
-		})
+	if p.NFS != nil {
+		for _, n := range p.NFS.Volumes {
+			cc.NFSVolumes = append(cc.NFSVolumes, ansible.NFSVolume{
+				Path: n.Path,
+				Host: n.Host,
+			})
+		}
 	}
 
 	cc.EnableGluster = p.Storage.Nodes != nil && len(p.Storage.Nodes) > 0
@@ -754,18 +778,29 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 	cc.CloudProvider = p.Cluster.CloudProvider.Provider
 	cc.CloudConfig = p.Cluster.CloudProvider.Config
 
+	// additional files
+	for _, n := range p.AdditionalFiles {
+		cc.AdditionalFiles = append(cc.AdditionalFiles, ansible.AdditionalFile{
+			Source:      n.Source,
+			Destination: n.Destination,
+			Hosts:       n.Hosts,
+		})
+	}
+
 	// add_ons
 	cc.RunPodValidation = p.NetworkConfigured()
 	// CNI
 	if p.AddOns.CNI != nil && !p.AddOns.CNI.Disable {
 		cc.CNI.Enabled = true
 		cc.CNI.Provider = p.AddOns.CNI.Provider
+		// Calico
 		cc.CNI.Options.Calico.Mode = p.AddOns.CNI.Options.Calico.Mode
 		cc.CNI.Options.Calico.LogLevel = p.AddOns.CNI.Options.Calico.LogLevel
 		cc.CNI.Options.Calico.WorkloadMTU = p.AddOns.CNI.Options.Calico.WorkloadMTU
 		cc.CNI.Options.Calico.FelixInputMTU = p.AddOns.CNI.Options.Calico.FelixInputMTU
 		cc.CNI.Options.Calico.IPAutodetectionMethod = p.AddOns.CNI.Options.Calico.IPAutodetectionMethod
-
+		// Weave
+		cc.CNI.Options.Weave.Password = p.AddOns.CNI.Options.Weave.Password
 		if cc.CNI.Provider == cniProviderContiv {
 			cc.InsecureNetworkingEtcd = true
 		}
@@ -774,6 +809,7 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 	// DNS
 	cc.DNS.Enabled = !p.AddOns.DNS.Disable
 	cc.DNS.Provider = p.AddOns.DNS.Provider
+	cc.DNS.Options.Replicas = p.AddOns.DNS.Options.Replicas
 
 	// heapster
 	if p.AddOns.HeapsterMonitoring != nil && !p.AddOns.HeapsterMonitoring.Disable {
@@ -791,6 +827,7 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 	cc.Dashboard.Enabled = true
 	if p.AddOns.Dashboard != nil && p.AddOns.Dashboard.Disable {
 		cc.Dashboard.Enabled = false
+		cc.Dashboard.Options.ServiceType = p.AddOns.Dashboard.Options.ServiceType
 	}
 
 	// package_manager
@@ -816,6 +853,17 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 			cc.NodeLabels[n.Host] = append(val, keyValueList(n.Labels)...)
 		} else {
 			cc.NodeLabels[n.Host] = keyValueList(n.Labels)
+		}
+	}
+	// merge node taints
+	// cannot use inventory file because nodes share roles
+	// set it to a map[host][]key=value:effect
+	cc.NodeTaints = make(map[string][]string)
+	for _, n := range p.getAllNodes() {
+		if val, ok := cc.NodeTaints[n.Host]; ok {
+			cc.NodeLabels[n.Host] = append(val, keyValueEffectList(n.Taints)...)
+		} else {
+			cc.NodeTaints[n.Host] = keyValueEffectList(n.Taints)
 		}
 	}
 
@@ -979,4 +1027,12 @@ func keyValueList(in map[string]string) []string {
 		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
 	}
 	return pairs
+}
+
+func keyValueEffectList(in []Taint) []string {
+	taints := make([]string, 0, len(in))
+	for _, taint := range in {
+		taints = append(taints, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
+	}
+	return taints
 }

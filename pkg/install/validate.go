@@ -143,13 +143,14 @@ func (p *Plan) validate() (bool, []error) {
 	}
 
 	v.validateWithErrPrefix("Docker", p.Docker)
+	v.validate(&additionalFilesGroup{AdditionalFiles: p.AdditionalFiles, Plan: p})
 	v.validate(&p.AddOns)
 	v.validate(nodeList{Nodes: p.getAllNodes()})
 	v.validateWithErrPrefix("Etcd nodes", &p.Etcd)
 	v.validateWithErrPrefix("Master nodes", &p.Master)
 	v.validateWithErrPrefix("Worker nodes", &p.Worker)
 	v.validateWithErrPrefix("Ingress nodes", &p.Ingress)
-	v.validate(&p.NFS)
+	v.validate(p.NFS)
 	v.validateWithErrPrefix("Storage nodes", &p.Storage)
 
 	return v.valid()
@@ -255,11 +256,43 @@ func (c *CloudProvider) validate() (bool, []error) {
 	return v.valid()
 }
 
+type additionalFilesGroup struct {
+	AdditionalFiles []AdditionalFile
+	Plan            *Plan
+}
+
+func (fg *additionalFilesGroup) validate() (bool, []error) {
+	v := newValidator()
+	for _, f := range fg.AdditionalFiles {
+		if len(f.Hosts) < 1 {
+			v.addError(errors.New("File hosts cannot be empty"))
+		}
+		for _, h := range f.Hosts {
+			if !(fg.Plan.HostExists(h) || h == "all" || fg.Plan.ValidRole(h)) {
+				v.addError(fmt.Errorf("File host %q does not match any hosts or roles in the plan file", h))
+			}
+		}
+		if !f.SkipValidation {
+			if _, err := os.Stat(f.Source); os.IsNotExist(err) {
+				v.addError(fmt.Errorf("File source %q doesn't exist", f.Source))
+			}
+		}
+		if f.Source == "" || !filepath.IsAbs(f.Source) {
+			v.addError(fmt.Errorf("File source %q must be a valid absolute path", f.Source))
+		}
+		if f.Destination == "" || !filepath.IsAbs(f.Destination) {
+			v.addError(fmt.Errorf("File destination %q must be a valid absolute path", f.Destination))
+		}
+	}
+	return v.valid()
+}
+
 func (f *AddOns) validate() (bool, []error) {
 	v := newValidator()
 	v.validate(f.CNI)
 	v.validate(f.DNS)
 	v.validate(f.HeapsterMonitoring)
+	v.validate(f.Dashboard)
 	v.validate(&f.PackageManager)
 	return v.valid()
 }
@@ -300,6 +333,16 @@ func (h *HeapsterMonitoring) validate() (bool, []error) {
 		}
 		if !util.Contains(h.Options.Heapster.ServiceType, serviceTypes()) {
 			v.addError(fmt.Errorf("Heapster Service Type %q is not a valid option %v", h.Options.Heapster.ServiceType, serviceTypes()))
+		}
+	}
+	return v.valid()
+}
+
+func (d *Dashboard) validate() (bool, []error) {
+	v := newValidator()
+	if d != nil && !d.Disable {
+		if !util.Contains(d.Options.ServiceType, serviceTypes()) {
+			v.addError(fmt.Errorf("Dashboard Service Type %q is not a valid option %v", d.Options.ServiceType, serviceTypes()))
 		}
 	}
 	return v.valid()
@@ -487,7 +530,7 @@ func (n *Node) validate() (bool, []error) {
 	if ip := net.ParseIP(n.InternalIP); n.InternalIP != "" && ip == nil {
 		v.addError(fmt.Errorf("Invalid InternalIP provided"))
 	}
-	// validate node labels don't start with 'kismatic/' as that is reserved
+	// Validate node labels don't start with 'kismatic/' as that is reserved
 	for key, val := range n.Labels {
 		if strings.HasPrefix(key, "kismatic/") {
 			v.addError(fmt.Errorf("Node label %q cannot start with 'kismatic/'", key))
@@ -499,6 +542,24 @@ func (n *Node) validate() (bool, []error) {
 		errs = validation.IsValidLabelValue(val)
 		for _, err := range errs {
 			v.addError(fmt.Errorf("Node label %q is not valid %s", val, err))
+		}
+	}
+	// Validate node taints don't start with 'kismatic/' as that is reserved
+	// Don't validate effects as those will likely change
+	for _, taint := range n.Taints {
+		if strings.HasPrefix(taint.Key, "kismatic/") {
+			v.addError(fmt.Errorf("Node taint %q cannot start with 'kismatic/'", taint.Key))
+		}
+		errs := validation.IsQualifiedName(taint.Key)
+		for _, err := range errs {
+			v.addError(fmt.Errorf("Node taint name %q is not valid %s", taint.Key, err))
+		}
+		errs = validation.IsValidLabelValue(taint.Value)
+		for _, err := range errs {
+			v.addError(fmt.Errorf("Node taint %q is not valid %s", taint.Value, err))
+		}
+		if !util.Contains(taint.Effect, taintEffects()) {
+			v.addError(fmt.Errorf("Node taint effect %q is not valid. Valid effects are: %v", taint.Effect, taintEffects()))
 		}
 	}
 	return v.valid()
@@ -557,6 +618,9 @@ func (dlvm *DockerStorageDirectLVMDeprecated) validate() (bool, []error) {
 
 func (nfs *NFS) validate() (bool, []error) {
 	v := newValidator()
+	if nfs == nil {
+		return v.valid()
+	}
 	uniqueVolumes := make(map[NFSVolume]bool)
 	for _, vol := range nfs.Volumes {
 		v.validate(vol)

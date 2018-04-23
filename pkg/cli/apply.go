@@ -23,6 +23,7 @@ type applyCmd struct {
 	outputFormat       string
 	skipPreFlight      bool
 	restartServices    bool
+	limit              []string
 }
 
 type applyOpts struct {
@@ -31,6 +32,7 @@ type applyOpts struct {
 	verbose            bool
 	outputFormat       string
 	skipPreFlight      bool
+	limit              []string
 }
 
 // NewCmdApply creates a cluter using the plan file
@@ -73,6 +75,7 @@ func NewCmdApply(out io.Writer) *cobra.Command {
 				outputFormat:       applyOpts.outputFormat,
 				skipPreFlight:      applyOpts.skipPreFlight,
 				restartServices:    applyOpts.restartServices,
+				limit:              applyOpts.limit,
 			}
 			plan, err := planner.Read()
 			if err != nil {
@@ -92,6 +95,7 @@ func NewCmdApply(out io.Writer) *cobra.Command {
 	}
 
 	// Flags
+	cmd.Flags().StringSliceVar(&applyOpts.limit, "limit", []string{}, "comma-separated list of hostnames to limit the execution to a subset of nodes")
 	cmd.Flags().BoolVar(&applyOpts.restartServices, "restart-services", false, "force restart cluster services (Use with care)")
 	cmd.Flags().BoolVar(&applyOpts.verbose, "verbose", false, "enable verbose logging from the installation")
 	cmd.Flags().StringVarP(&applyOpts.outputFormat, "output", "o", "simple", "installation output format (options \"simple\"|\"raw\")")
@@ -108,6 +112,7 @@ func (c *applyCmd) run() error {
 		outputFormat:       c.outputFormat,
 		skipPreFlight:      c.skipPreFlight,
 		generatedAssetsDir: c.generatedAssetsDir,
+		limit:              c.limit,
 	}
 	err := doValidate(c.out, c.planner, opts)
 	if err != nil {
@@ -132,7 +137,7 @@ func (c *applyCmd) run() error {
 	util.PrettyPrintOk(c.out, "Generated kubeconfig file in the %q directory", c.generatedAssetsDir)
 
 	// Perform the installation
-	if err := c.executor.Install(plan, c.restartServices); err != nil {
+	if err := c.executor.Install(plan, c.restartServices, c.limit...); err != nil {
 		return fmt.Errorf("error installing: %v", err)
 	}
 
