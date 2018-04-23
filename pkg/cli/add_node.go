@@ -51,8 +51,8 @@ func NewCmdAddNode(out io.Writer) *cobra.Command {
 				return err
 			}
 			if spec.Status.CurrentState != store.Unmanaged {
-				return fmt.Errorf(`the add-node workflow is only defined for bare-metal clusters. If you need to add a node to a cluster that Kismatic provisioned,
-					simply change the number of workers defined in the plan at %s, and then re-run the provision and apply commands`, planPath)
+				return fmt.Errorf(`The add-node workflow is only defined for 'unmanaged' clusters.
+Change the number of nodes defined in the plan at %q, and then re-run the "provision" and "apply" commands.`, planPath)
 			}
 
 			newNode := install.Node{

@@ -32,7 +32,7 @@ func NewCmdPlan(in io.Reader, out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if plan.Provisioner.Provider == "" { // consider the cluster unmanaged IFF the user doesn't want a cloud provider, emulating the 1.0 workflow
+			if plan.Provisioner.Provider == "" { // consider the cluster unmanaged IFF the user doesn't want a cloud provider
 				state = store.Unmanaged
 			}
 			spec := plan.ConvertToSpec(state)
@@ -53,7 +53,7 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 	}
 	clusterFromStore, err := clusterStore.Get(name)
 	if clusterFromStore != nil {
-		return nil, fmt.Errorf("cluster with name %s already exists", name)
+		return nil, fmt.Errorf("cluster with name %q already exists", name)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving cluster information: %v", err)
@@ -63,7 +63,7 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner, clusterSto
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("cannot plan cluster with name %s, please use another name", name)
+		return nil, fmt.Errorf("cannot plan cluster with name %q, please use another name", name)
 	}
 
 	planner.File, _, _ = generateDirsFromName(name)

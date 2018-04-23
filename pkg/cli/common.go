@@ -65,7 +65,7 @@ func CheckClusterExists(name string, s store.ClusterStore) (bool, error) {
 			}
 		}
 	}
-	return false, fmt.Errorf("cluster with name %s not found. If you have a plan file, but your cluster doesn't exist, please run kismatic import PLAN_FILE_PATH GENERATED_ASSETS_DIR", name)
+	return false, fmt.Errorf("cluster with name %q not found. If you have a plan file, but your cluster doesn't exist, please run kismatic import PLAN_FILE_PATH GENERATED_ASSETS_DIR", name)
 }
 
 // CreateStoreIfNotExists creates a database file at location path. returns ClusterStore that will interact with that file, and a logger for the store.

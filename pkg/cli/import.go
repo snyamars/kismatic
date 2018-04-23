@@ -59,9 +59,9 @@ func NewCmdImport(out io.Writer) *cobra.Command {
 			exists, err := CheckClusterExists(clusterName, s)
 			if exists {
 				if err != nil {
-					return fmt.Errorf("cluster with name %s already exists, cannot import: %v", clusterName, err)
+					return fmt.Errorf("error importing cluster %q: %v", clusterName, err)
 				}
-				return fmt.Errorf("cluster with name %s already exists, cannot import", clusterName)
+				return fmt.Errorf("cluster with name %q already exists, will not import", clusterName)
 			}
 			spec := plan.ConvertToSpec(store.Unmanaged)
 			// No need for an "unmanagedFailed" state. If the import fails, simply don't add it to the db.
