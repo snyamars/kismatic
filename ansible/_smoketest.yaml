@@ -1,4 +1,13 @@
 ---
+  - hosts: worker:ingress:storage
+    any_errors_fatal: true
+    name: "Validate Nodes are Ready"
+    become: yes
+    run_once: true
+
+    roles:
+      - node-smoke-test
+
   - hosts: master
     any_errors_fatal: true
     name: Smoke Test Master Node

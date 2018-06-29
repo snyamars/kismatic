@@ -73,7 +73,7 @@ func (ae *ansibleExecutor) AddNode(originalPlan *Plan, newNode Node, roles []str
 	cc.NewNode = newNode.Host
 	t = task{
 		name:           "add-node-smoke-test",
-		playbook:       "_node-smoke-test.yaml",
+		playbook:       "smoketest.yaml",
 		plan:           updatedPlan,
 		inventory:      inventory,
 		clusterCatalog: *cc,
@@ -103,6 +103,10 @@ func (ae *ansibleExecutor) AddNode(originalPlan *Plan, newNode Node, roles []str
 }
 
 func AddNodeToPlan(plan Plan, node Node, roles []string) Plan {
+	if util.Contains("master", roles) {
+		plan.Master.ExpectedCount++
+		plan.Master.Nodes = append(plan.Master.Nodes, node)
+	}
 	if util.Contains("worker", roles) {
 		plan.Worker.ExpectedCount++
 		plan.Worker.Nodes = append(plan.Worker.Nodes, node)

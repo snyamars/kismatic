@@ -22,7 +22,7 @@ type addNodeOpts struct {
 	SkipPreFlight            bool
 }
 
-var validRoles = []string{"worker", "ingress", "storage"}
+var validRoles = []string{"master", "worker", "ingress", "storage"}
 
 // NewCmdAddNode returns the command for adding node to the cluster
 func NewCmdAddNode(out io.Writer, installOpts *installOpts) *cobra.Command {
@@ -64,7 +64,7 @@ func NewCmdAddNode(out io.Writer, installOpts *installOpts) *cobra.Command {
 			return doAddNode(out, installOpts.planFilename, opts, newNode)
 		},
 	}
-	cmd.Flags().StringSliceVar(&opts.Roles, "roles", []string{}, "roles separated by ',' (options \"worker\"|\"ingress\"|\"storage\")")
+	cmd.Flags().StringSliceVar(&opts.Roles, "roles", []string{}, "roles separated by ',' (options \"master\"|\"worker\"|\"ingress\"|\"storage\")")
 	cmd.Flags().StringSliceVarP(&opts.NodeLabels, "labels", "l", []string{}, "key=value pairs separated by ','")
 	cmd.Flags().StringVar(&opts.GeneratedAssetsDirectory, "generated-assets-dir", "generated", "path to the directory where assets generated during the installation process will be stored")
 	cmd.Flags().BoolVar(&opts.RestartServices, "restart-services", false, "force restart clusters services (Use with care)")

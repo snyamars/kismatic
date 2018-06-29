@@ -5,9 +5,16 @@
   - include: _kubeconfig.yaml
   - include: _packages-repo.yaml
     when: allow_package_installation|bool == true
+  # docker
   - include: _docker.yaml
     when: docker.enabled|bool == true
+  # kubernetes
   - include: _kubelet.yaml
+  - include: _kube-apiserver.yaml
+  - include: _kube-scheduler.yaml
+  - include: _kube-controller-manager.yaml
+  # validating has a dependecy on the API server for the static pods
+  - include: _validate-control-plane-node.yaml
   - include: _kube-proxy.yaml
   - include: _label-nodes.yaml
   - include: _calico.yaml
