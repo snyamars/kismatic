@@ -14,17 +14,6 @@
       mode: "{{ kubernetes_service_mode }}"
     when: cloud_config != ''
 
-
-  - name: copy kubelet config file
-    template:
-      src: config.yaml
-      dest: "/var/lib/kubelet/"
-      owner: "{{ kubernetes_owner }}"
-      group: "{{ kubernetes_group }}"
-      mode: 0777
-
-
-
   - name: create {{ network_plugin_dir }} directory
     file:
       path: "{{ network_plugin_dir }}"

@@ -1,7 +1,7 @@
 official_images:
   etcd:
     name: quay.io/coreos/etcd
-    version: v3.3.10
+    version: v3.1.13
   kube_proxy:
     name: gcr.io/google-containers/kube-proxy-amd64
     version: "{{ versions.kubernetes }}"
@@ -16,19 +16,19 @@ official_images:
     version: "{{ versions.kubernetes }}"
   calico_node:
     name: calico/node
-    version: v3.10.0
+    version: v2.6.10
   calico_ctl:
     name: calico/ctl
-    version: v3.10.0
+    version: v1.6.4
   calico_cni:
     name: calico/cni
-    version: v3.10.0
+    version: v1.11.6
   calico_kube_controller:
     name: calico/kube-controllers
-    version: v3.10.0
+    version: v1.0.4
   cni_bin:
-    name: cirrocloud/cni-bin
-    version: v1.15.3
+    name: apprenda/cni-bin
+    version: v0.6.0
   contiv_netplugin:
     name: contiv/netplugin
     version: 1.1.1
@@ -67,16 +67,16 @@ official_images:
     version: 1.14.10
   coredns:
     name: coredns/coredns
-    version: 1.6.2
+    version: 1.1.3
   kubernetes_dashboard:
     name: gcr.io/google_containers/kubernetes-dashboard-amd64
-    version: v1.10.0
+    version: v1.8.3
   apprenda_tcp_healthz: 
     name: apprenda/tcp-healthz-amd64
     version: v1.0.0
   helm:
     name: gcr.io/kubernetes-helm/tiller
-    version: v2.11.0
+    version: v2.9.1
   heapster:
     name: gcr.io/google_containers/heapster-amd64
     version: v1.5.3
@@ -85,7 +85,7 @@ official_images:
     version: v1.3.3
   rescheduler:
     name: gcr.io/google-containers/rescheduler
-    version: v0.4.0
+    version: v0.3.1
   metrics_server:
-    name: quay.io/coreos/kube-state-metrics
-    version: v1.8.0
+    name: gcr.io/google_containers/metrics-server-amd64
+    version: v0.2.1
