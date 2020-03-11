@@ -127,6 +127,7 @@ cloud_config: "{% if cloud_config_local is defined and cloud_config_local != '' 
 # TODO: Do we want to change this?
 kubernetes_certificates_dir: "{{ kubernetes_install_dir }}/pki"
 flexvolume_plugin_dir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+config_file: "/var/lib/kubelet/config.yaml"
 kubernetes_certificates:
   ca: "{{ kubernetes_certificates_dir }}/ca.pem"
   proxy_client_ca: "{{ kubernetes_certificates_dir }}/proxy-client-ca.pem"
@@ -163,7 +164,7 @@ kubernetes_api_server_option_defaults:
   "proxy-client-cert-file": "{{ kubernetes_certificates.proxy_client }}"
   "proxy-client-key-file": "{{ kubernetes_certificates.proxy_client_key }}"
   "profiling": "false"
-  "repair-malformed-updates" : "false"
+#  "repair-malformed-updates" : "false"
   "requestheader-allowed-names": ""
   "requestheader-extra-headers-prefix": "X-Remote-Extra-"
   "requestheader-group-headers": "X-Remote-Group"
@@ -217,11 +218,10 @@ kube_proxy_option_defaults:
   "v": "2"
 
 kubelet_defaults:
-  "allow-privileged": "true"
+#  "allow-privileged": "true"
   "authentication-token-webhook": "true"
   "authorization-mode": "Webhook"
   "event-qps": "0"
-  "cadvisor-port" : "0"
   "client-ca-file": "{{ kubernetes_certificates.ca }}"
   "cloud-provider": "{{ cloud_provider }}"
   "cloud-config": "{{ cloud_config }}"
@@ -239,10 +239,11 @@ kubelet_defaults:
   "node-ip": "{{ internal_ipv4 }}"
   "pod-infra-container-image": "{{ images.pause }}"
   "pod-manifest-path": "{{ kubelet_pod_manifests_dir }}"
-  "read-only-port": "0"
+  "read-only-port": "10255"
   "register-schedulable": "{{ kubernetes_schedulable }}"
   "serialize-image-pulls": "false"
   "streaming-connection-idle-timeout": "0"
+  "config": "{{ config_file }}"
   "tls-cert-file": "{{ kubernetes_certificates.kubelet }}"
   "tls-private-key-file": "{{ kubernetes_certificates.kubelet_key }}"
   "volume-plugin-dir": "{{ flexvolume_plugin_dir }}"

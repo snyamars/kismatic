@@ -1,0 +1,13 @@
+---
+  - name: create /etc/kubernetes/specs directory
+    file:
+      path: "{{ kubernetes_spec_dir }}"
+      state: directory
+
+  - name: copy metricbeat-kubernetes.yaml to remote
+    template:
+      src: metricbeat-kubernetes.yaml 
+      dest: "{{ kubernetes_spec_dir }}/metricbeat-kubernetes.yaml"
+
+  - name: start elastic metrics-server
+    command: kubectl --kubeconfig {{ kubernetes_kubeconfig.kubectl }} apply -f {{ kubernetes_spec_dir }}/metricbeat-kubernetes.yaml

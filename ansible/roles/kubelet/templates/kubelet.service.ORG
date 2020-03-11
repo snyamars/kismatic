@@ -12,6 +12,10 @@ ExecStart=/usr/bin/kubelet \
   --{{ option[0] }}={{ option[1] }} \
 {% endif %}
 {% endfor %}
+Restart=on-failure
+RestartSec=3
+RestartForceExitStatus=SIGPIPE
+WorkingDirectory=/root/
 
 [Install]
 WantedBy=multi-user.target

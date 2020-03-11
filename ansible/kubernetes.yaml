@@ -31,8 +31,8 @@
     when: cni.enabled|bool == true and cni.provider == "calico"
   - include: _calico-validate.yaml
     when: cni.enabled|bool == true and cni.provider == "calico"
-  - include: _calico-network-policy.yaml
-    when: cni.enabled|bool == true and cni.provider == "calico"
+#  - include: _calico-network-policy.yaml
+#    when: cni.enabled|bool == true and cni.provider == "calico"
   - include: _weave.yaml
     when: cni.enabled|bool == true and cni.provider == "weave"
   - include: _weave-validate.yaml

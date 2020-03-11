@@ -9,3 +9,4 @@
 
     roles:
       - metrics-server
+      - elastic-metrics

@@ -24,17 +24,18 @@ KET operational tools include:
 ## Components
 | Component | Version |
 | --- | --- |
-| Kubernetes | v1.10.5 |
+| Kubernetes | v1.15.3 |
 | Docker | v17.03.2.ce |
-| Etcd (for Kubernetes) | v3.1.13 |
-| Etcd (for Calico & Contiv) | v3.1.13 |
-| Calico | v2.6.10 |
+| Etcd (for Kubernetes) | v3.3.10 |
+| Etcd (for Calico & Contiv) | v3.3.10 |
+| Calico | v3.10.0 |
 | Weave | v2.3.0 |
 | Contiv | v1.1.1 |
 | KubeDNS | 1.14.10 |
 | CoreDNS | 1.1.3 |
 | Nginx Ingress Controller | 0.15.0 |
-| Helm | v2.9.1 |
+| Helm | v2.11.0 |
+
 
 
 [Download KET here](https://github.com/apprenda/kismatic/releases)

@@ -7,6 +7,9 @@ metadata:
   name: calico-config
   namespace: kube-system
 data:
+  # Configure this with the location of your etcd cluster.
+  etcd_endpoints: "{{ etcd_networking_cluster_ip_list }}"
+  
   # Typha is disabled.
   typha_service_name: "none"
   # Configure the backend to use.
@@ -24,28 +27,38 @@ data:
       "plugins": [
         {
           "type": "calico",
-          "log_level": "info",
+          "etcd_endpoints": "__ETCD_ENDPOINTS__",
+          "etcd_key_file": "{{ kubernetes_certificates.etcd_client_key }}",
+          "etcd_cert_file": "{{ kubernetes_certificates.etcd_client }}",
+          "etcd_ca_cert_file": "{{ kubernetes_certificates.ca }}",
+          "log_level": "{{ cni.options.calico.log_level }}",
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
-          "mtu": __CNI_MTU__,
+          "mtu": {{ cni.options.calico.workload_mtu }},
           "ipam": {
               "type": "calico-ipam"
           },
           "policy": {
-              "type": "k8s"
+          "type": "k8s"
+          "k8s_api_root": "https://__KUBERNETES_SERVICE_HOST__:__KUBERNETES_SERVICE_PORT__",
+          "k8s_auth_token": "__SERVICEACCOUNT_TOKEN__" 
           },
           "kubernetes": {
-              "kubeconfig": "__KUBECONFIG_FILEPATH__"
+          "kubeconfig": "__KUBECONFIG_FILEPATH__"
           }
-        },
+        }{% if cni.options.portmap.enabled == true %},
         {
           "type": "portmap",
           "snat": true,
           "capabilities": {"portMappings": true}
-        }
+        }{% endif %}
       ]
     }
-
+  # If you're using TLS enabled etcd uncomment the following.
+  # You must also populate the Secret below with these files.
+  etcd_ca: "{{ kubernetes_certificates.ca }}"
+  etcd_cert: "{{ kubernetes_certificates.etcd_client }}"
+  etcd_key: "{{ kubernetes_certificates.etcd_client_key }}"
 ---
 # Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1beta1
@@ -474,7 +487,11 @@ metadata:
   name: calico-node
   namespace: kube-system
   labels:
+    tier: control-plane
+    component: calico-node
     k8s-app: calico-node
+  annotations:
+    kismatic/version: "{{ kismatic_short_version }}"
 spec:
   selector:
     matchLabels:
@@ -581,7 +598,13 @@ spec:
         - name: calico-node
           image: calico/node:v3.9.0
           env:
-            # Use Kubernetes API as the backing datastore.
+            # The location of the Calico etcd cluster.
+            - name: ETCD_ENDPOINTS
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: etcd_endpoints
+# Use Kubernetes API as the backing datastore.
             - name: DATASTORE_TYPE
               value: "kubernetes"
             # Wait for the datastore.
@@ -606,7 +629,7 @@ spec:
               value: "autodetect"
             # Enable IPIP
             - name: CALICO_IPV4POOL_IPIP
-              value: "Always"
+              value: {% if cni.options.calico.mode == 'overlay' %}"always"{% else %}"off"{% endif %}
             # Set MTU for tunnel device used if ipip is enabled
             - name: FELIX_IPINIPMTU
               valueFrom:
@@ -617,7 +640,7 @@ spec:
             # chosen from this range. Changing this value after installation will have
             # no effect. This should fall within `--cluster-cidr`.
             - name: CALICO_IPV4POOL_CIDR
-              value: "192.168.0.0/16"
+              value: "{{ kubernetes_pods_cidr }}"
             # Disable file logging so `kubectl logs` works.
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -629,7 +652,7 @@ spec:
               value: "false"
             # Set Felix logging to "info"
             - name: FELIX_LOGSEVERITYSCREEN
-              value: "info"
+              value: "{{ cni.options.calico.log_level }}"
             - name: FELIX_HEALTHENABLED
               value: "true"
           securityContext:
