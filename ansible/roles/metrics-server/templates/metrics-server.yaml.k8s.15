@@ -1,18 +1,9 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/version: 1.9.5
-  name: kube-state-metrics
-  namespace: kube-system
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/version: 1.9.5
+    app.kubernetes.io/version: v1.8.0
   name: kube-state-metrics
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -28,7 +19,7 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/version: 1.9.5
+    app.kubernetes.io/version: v1.8.0
   name: kube-state-metrics
 rules:
 - apiGroups:
@@ -114,7 +105,6 @@ rules:
   - storage.k8s.io
   resources:
   - storageclasses
-  - volumeattachments
   verbs:
   - list
   - watch
@@ -126,27 +116,42 @@ rules:
   verbs:
   - list
   - watch
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - networkpolicies
-  verbs:
-  - list
-  - watch
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - list
-  - watch
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/version: v1.8.0
+  name: kube-state-metrics
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/version: v1.8.0
+  name: kube-state-metrics
+  namespace: kube-system
+spec:
+  clusterIP: None
+  ports:
+  - name: http-metrics
+    port: 8080
+    targetPort: http-metrics
+  - name: telemetry
+    port: 8081
+    targetPort: telemetry
+  selector:
+    app.kubernetes.io/name: kube-state-metrics
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/version: 1.9.5
+    app.kubernetes.io/version: v1.8.0
   name: kube-state-metrics
   namespace: kube-system
 spec:
@@ -158,10 +163,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: kube-state-metrics
-        app.kubernetes.io/version: 1.9.5
+        app.kubernetes.io/version: v1.8.0
     spec:
       containers:
-      - image: quay.io/coreos/kube-state-metrics:v1.9.5
+      - image: quay.io/coreos/kube-state-metrics:v1.8.0
         livenessProbe:
           httpGet:
             path: /healthz
@@ -180,31 +185,6 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           timeoutSeconds: 5
-        securityContext:
-          runAsUser: 65534
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: kube-state-metrics
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/version: 1.9.5
-  name: kube-state-metrics
-  namespace: kube-system
-spec:
-  clusterIP: None
-  ports:
-  - name: http-metrics
-    port: 8080
-    targetPort: http-metrics
-  - name: telemetry
-    port: 8081
-    targetPort: telemetry
-  selector:
-    app.kubernetes.io/name: kube-state-metrics
----
-

@@ -49,8 +49,8 @@
     when: metricsserver.enabled|bool == true
   - include: _kube-dashboard.yaml
     when: dashboard.enabled|bool == true
-  - include: _helm.yaml
-    when: helm.enabled|bool == true
+#  - include: _helm.yaml
+#    when: helm.enabled|bool == true
   - include: _nginx-ingress.yaml
     when: configure_ingress|bool == true
   - include: _storage.yaml

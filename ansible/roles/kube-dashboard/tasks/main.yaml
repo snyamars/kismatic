@@ -13,7 +13,7 @@
 
   - block:
     - name: wait until kubernetes-dashboard pods are ready
-      command: kubectl --kubeconfig {{ kubernetes_kubeconfig.kubectl }} get deployment kubernetes-dashboard -n kube-system -o jsonpath='{.status.availableReplicas}'
+      command: kubectl --kubeconfig {{ kubernetes_kubeconfig.kubectl }} get deployment kubernetes-dashboard -n kubernetes-dashboard -o jsonpath='{.status.availableReplicas}'
       register: readyReplicas
       until: readyReplicas.stdout|int == [2, groups['worker'] | length] | min
       retries: 24

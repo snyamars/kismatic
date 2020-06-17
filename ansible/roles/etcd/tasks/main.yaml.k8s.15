@@ -38,7 +38,7 @@
 
   # test etcd
   - name: verify {{ etcd_name }} cluster health
-    command: 'echo done'
+    command: "docker run --net=host --volume=/etc/ssl/certs/:/etc/ssl/certs/:ro --volume={{etcd_install_dir}}:{{etcd_install_dir}}:ro {{ images.etcd }} /usr/local/bin/etcdctl --endpoint='https://127.0.0.1:{{ etcd_service_client_port }}/' --cert-file={{ etcd_certificates.etcd_client }} --key-file={{ etcd_certificates.etcd_client_key }} --ca-file={{ etcd_certificates.ca }} cluster-health"
     register: result
     until: result|success
     retries: 3
@@ -46,7 +46,7 @@
     when: "{{ etcd_insecure_validate|default('false')|bool == false }}"
 
   - name: verify {{ etcd_name }} cluster health
-    command: 'echo done'
+    command: "docker run --net=host --volume=/etc/ssl/certs/:/etc/ssl/certs/:ro /usr/local/bin/etcdctl --endpoint='http://127.0.0.1:{{ etcd_service_client_port }}/' cluster-health"
     register: result
     until: result|success
     retries: 3
