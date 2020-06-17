@@ -1,0 +1,12 @@
+---
+  - name: copy Kuberang to node
+    copy:
+      src: "{{ kuberang_path }}"
+      dest: "{{ bin_dir }}/kuberang"
+      mode: 0744
+  - name: run smoke test checks using Kuberang
+    command: >
+      "{{ bin_dir }}/kuberang"
+      "{% if load_private_images|bool == true %}--registry-url={{ docker_registry_full_url }}{% endif %}"
+      "{% if dns.enabled|bool == false%}--skip-dns-tests{% endif %}"
+      "{% if cni.provider == 'contiv' %}--ignore-pod-ip-accessibility-check=true{% endif %}"
