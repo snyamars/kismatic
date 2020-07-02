@@ -25,15 +25,15 @@ KET operational tools include:
 | Component | Version |
 | --- | --- |
 | Kubernetes | v1.18.3 |
-| Docker | v18.03.2.ce |
-| Etcd (for Kubernetes) | v3.3.10 |
-| Etcd (for Calico & Contiv) | v3.3.10 |
-| Calico | v3.10.0 |
+| Docker | v18.06.1.ce |
+| Etcd (for Kubernetes) | v3.4.3 |
+| Etcd (for Calico & Contiv) | v3.4.3 |
+| Calico | v3.14.1 |
 | Weave | v2.3.0 |
 | Contiv | v1.1.1 |
 | KubeDNS | 1.14.10 |
 | CoreDNS | 1.1.3 |
-| Nginx Ingress Controller | 0.15.0 |
+| Nginx Ingress Controller | 0.33.0 |
 | Helm | v2.11.0 |
 
 
