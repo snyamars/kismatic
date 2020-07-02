@@ -29,8 +29,6 @@ KET operational tools include:
 | Etcd (for Kubernetes) | v3.4.3 |
 | Etcd (for Calico & Contiv) | v3.4.3 |
 | Calico | v3.14.1 |
-| Weave | v2.3.0 |
-| Contiv | v1.1.1 |
 | KubeDNS | 1.15.13 |
 | CoreDNS | 1.6.7 |
 | Nginx Ingress Controller | 0.33.0 |
